@@ -20,15 +20,18 @@ export default function Setup() {
   const [challengerIds, setChallengerIds] = useState<string[]>([]);
   const [poolIds, setPoolIds] = useState<string[]>([]); 
   
-  const [champName, setChampName] = useState('Sem Colete 🦖');
-  const [challName, setChallName] = useState('Com Colete 🦕');
+  const [champName, setChampName] = useState('Sem Colete ');
+  const [challName, setChallName] = useState('Com Colete ');
   const [saving, setSaving] = useState(false);
+
+  // ESTADOS DOS CAPITÃES 👑
+  const [champCaptainId, setChampCaptainId] = useState<string | null>(null);
+  const [challCaptainId, setChallCaptainId] = useState<string | null>(null);
 
   // Atrasados (Smart Input)
   const [searchTerm, setSearchTerm] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [addingLate, setAddingLate] = useState(false);
-  
   const [showAbortModal, setShowAbortModal] = useState(false);
 
   useEffect(() => {
@@ -74,6 +77,23 @@ export default function Setup() {
 
   useEffect(() => { loadData(); }, [slug]);
 
+  // Garante que o time sempre tenha um capitão válido se houver alguém no time
+  useEffect(() => {
+    if (championIds.length > 0 && (!champCaptainId || !championIds.includes(champCaptainId))) {
+      setChampCaptainId(championIds[0]);
+    } else if (championIds.length === 0) {
+      setChampCaptainId(null);
+    }
+  }, [championIds, champCaptainId]);
+
+  useEffect(() => {
+    if (challengerIds.length > 0 && (!challCaptainId || !challengerIds.includes(challCaptainId))) {
+      setChallCaptainId(challengerIds[0]);
+    } else if (challengerIds.length === 0) {
+      setChallCaptainId(null);
+    }
+  }, [challengerIds, challCaptainId]);
+
   const handleAddLatecomer = async (existingId?: string, newName?: string) => {
     setAddingLate(true);
     let idToAdd = existingId;
@@ -111,15 +131,9 @@ export default function Setup() {
     }
   };
 
-  // ==========================================
-  // REMOVER DA SESSÃO (Sem confirmação chata!)
-  // ==========================================
   const handleRemoveFromSession = async (idToRemove: string) => {
-    // 1. Tira da tela imediatamente (Optimistic UI) para parecer super rápido
     const newPool = poolIds.filter(id => id !== idToRemove);
     setPoolIds(newPool);
-
-    // 2. Atualiza o banco no fundo silenciosamente
     const allPresentNow = [...championIds, ...challengerIds, ...newPool];
     try {
       await apiFetch(slug, '/api/sessions/update-presence', {
@@ -127,8 +141,7 @@ export default function Setup() {
         body: JSON.stringify({ session_id: sessionInfo.id, present_player_ids: allPresentNow })
       });
     } catch (e) {
-      alert("Deu erro ao remover o jogador. O banco de dados tropeçou!");
-      // Se der erro, a gente poderia colocar o cara de volta, mas vamos manter simples
+      console.error(e);
     }
   };
 
@@ -205,13 +218,17 @@ export default function Setup() {
     if (championIds.length === 0 || challengerIds.length === 0) return alert('Times vazios!');
     setSaving(true);
     try {
+      // MÁGICA DO CAPITÃO: Junta o nome do time com o nome do capitão selecionado!
+      const finalChampName = champCaptainId ? `${champName.trim()} (Cap: ${playersMap[champCaptainId].split(' ')[0]})` : champName.trim();
+      const finalChallName = challCaptainId ? `${challName.trim()} (Cap: ${playersMap[challCaptainId].split(' ')[0]})` : challName.trim();
+
       const allPresentNow = [...championIds, ...challengerIds, ...poolIds];
       await apiFetch(slug, '/api/sessions/setup-teams', {
         method: 'POST',
         body: JSON.stringify({
           session_id: sessionInfo.id,
-          champion_name: champName,
-          challenger_name: challName,
+          champion_name: finalChampName,
+          challenger_name: finalChallName,
           champion_player_ids: championIds,
           challenger_player_ids: challengerIds,
         })
@@ -233,18 +250,15 @@ export default function Setup() {
   
   const allPresent = [...poolIds, ...championIds, ...challengerIds];
   const absentPlayers = allPlayers.filter(p => !allPresent.includes(p.id));
-  
   const normalizedSearch = searchTerm.toLowerCase();
   const filteredAbsent = absentPlayers.filter(p => p.name.toLowerCase().includes(normalizedSearch));
   const exactMatchExists = filteredAbsent.some(p => p.name.toLowerCase() === normalizedSearch);
-  
   const filteredFixos = filteredAbsent.filter(p => !p.is_guest);
   const filteredGuests = filteredAbsent.filter(p => p.is_guest);
 
   return (
     <div className="min-h-screen bg-orange-50 p-4 pb-20 max-w-md mx-auto font-sans relative">
       
-      {/* HEADER E ABORTAR */}
       <div className="flex justify-between items-center mb-6">
         <button onClick={() => router.push(`/g/${slug}`)} className="text-orange-800 font-black flex items-center gap-2">
           <span>◀</span> Sair
@@ -258,10 +272,8 @@ export default function Setup() {
         Tirando os<br/><span className="text-orange-500">Times</span> 🤼
       </h1>
 
-      {/* SESSÃO DE ATRASADOS (SMART INPUT) */}
       <div className="bg-white p-5 rounded-[2rem] mb-6 shadow-sm border-b-8 border-orange-200 relative z-40">
         <h3 className="font-black text-orange-800 mb-3 flex items-center gap-2">⏱️ Chegou atrasado?</h3>
-        
         <div className="relative">
           <input 
             type="text" 
@@ -277,44 +289,32 @@ export default function Setup() {
           {showDropdown && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} />
-              
               <div className="absolute top-full left-0 right-0 mt-2 bg-white border-4 border-orange-200 rounded-[1.5rem] shadow-xl overflow-hidden z-50 max-h-72 overflow-y-auto">
-                
                 {filteredFixos.length > 0 && (
                   <div className="p-2">
                     <div className="text-xs font-black text-gray-400 uppercase tracking-widest px-3 py-1">A Galera (Fixos)</div>
                     {filteredFixos.map(p => (
-                      <button key={p.id} onClick={() => handleAddLatecomer(p.id)} className="w-full text-left font-black text-green-900 bg-green-50 hover:bg-green-100 p-3 rounded-xl mb-1 active:scale-95 transition-transform">
-                        {p.name}
-                      </button>
+                      <button key={p.id} onClick={() => handleAddLatecomer(p.id)} className="w-full text-left font-black text-green-900 bg-green-50 hover:bg-green-100 p-3 rounded-xl mb-1 active:scale-95 transition-transform">{p.name}</button>
                     ))}
                   </div>
                 )}
-
                 {filteredGuests.length > 0 && (
                   <div className="p-2 border-t-2 border-gray-50">
                     <div className="text-xs font-black text-gray-400 uppercase tracking-widest px-3 py-1">Visitantes Antigos</div>
                     {filteredGuests.map(p => (
-                      <button key={p.id} onClick={() => handleAddLatecomer(p.id)} className="w-full text-left font-black text-orange-900 bg-orange-50 hover:bg-orange-100 p-3 rounded-xl mb-1 active:scale-95 transition-transform">
-                        {p.name}
-                      </button>
+                      <button key={p.id} onClick={() => handleAddLatecomer(p.id)} className="w-full text-left font-black text-orange-900 bg-orange-50 hover:bg-orange-100 p-3 rounded-xl mb-1 active:scale-95 transition-transform">{p.name}</button>
                     ))}
                   </div>
                 )}
-
                 {searchTerm.trim() !== '' && !exactMatchExists && (
                   <div className="p-2 border-t-4 border-orange-100 bg-orange-50">
                     <button onClick={() => handleAddLatecomer(undefined, searchTerm)} className="w-full flex items-center justify-between text-left font-black text-white bg-orange-500 hover:bg-orange-600 p-4 rounded-xl active:scale-95 transition-transform shadow-sm">
-                      <span>Adicionar "{searchTerm}"</span>
-                      <span className="bg-white text-orange-600 px-2 py-1 rounded-lg text-xs uppercase tracking-wider">+ Novo</span>
+                      <span>Adicionar "{searchTerm}"</span><span className="bg-white text-orange-600 px-2 py-1 rounded-lg text-xs uppercase tracking-wider">+ Novo</span>
                     </button>
                   </div>
                 )}
-
                 {filteredAbsent.length === 0 && searchTerm.trim() === '' && (
-                  <div className="p-6 text-center text-gray-400 font-bold">
-                    Todo mundo já tá na quadra! 🙌
-                  </div>
+                  <div className="p-6 text-center text-gray-400 font-bold">Todo mundo já tá na quadra! 🙌</div>
                 )}
               </div>
             </>
@@ -326,7 +326,7 @@ export default function Setup() {
         ⚖️ SORTEIO BALANCEADO
       </button>
 
-      {/* BANCO DE AREIA COM BOTÃO DE EXCLUIR MENORZINHO */}
+      {/* BANCO DE AREIA */}
       {poolIds.length > 0 && (
         <div className="bg-white p-5 rounded-[2rem] mb-6 border-4 border-orange-200 shadow-sm relative z-10">
           <h3 className="font-black text-gray-400 mb-3 text-lg">{poolTitle}</h3>
@@ -334,14 +334,10 @@ export default function Setup() {
             {poolIds.map(id => (
               <div key={id} className="bg-gray-100 pl-4 pr-2 py-2 rounded-2xl flex items-center gap-2 shadow-sm border-2 border-gray-200">
                 <span className="font-black text-gray-800 text-lg whitespace-nowrap">{playersMap[id] || 'Pereba'}</span>
-                
                 <div className="flex gap-1 ml-1">
                   <button onClick={() => movePlayer(id, 'pool', 'champ')} className="bg-green-100 text-green-600 px-3 py-1 rounded-xl font-black text-xl active:scale-95 transition-transform">◀</button>
                   <button onClick={() => movePlayer(id, 'pool', 'chall')} className="bg-red-100 text-red-600 px-3 py-1 rounded-xl font-black text-xl active:scale-95 transition-transform">▶</button>
-                  {/* Lixeira Menor e sem confirmação */}
-                  <button onClick={() => handleRemoveFromSession(id)} className="bg-gray-200 text-gray-500 hover:bg-red-200 hover:text-red-600 px-2 py-1 rounded-lg font-black text-lg active:scale-95 transition-colors ml-1" title="Mandar pro chuveiro">
-                    🗑️
-                  </button>
+                  <button onClick={() => handleRemoveFromSession(id)} className="bg-gray-200 text-gray-500 hover:bg-red-200 hover:text-red-600 px-2 py-1 rounded-lg font-black text-lg active:scale-95 transition-colors ml-1" title="Mandar pro chuveiro">🗑️</button>
                 </div>
               </div>
             ))}
@@ -350,23 +346,32 @@ export default function Setup() {
       )}
 
       <div className="flex gap-4 mb-8 relative z-10">
+        {/* TIME A (VERDE) */}
         <div className="flex-1 bg-green-50 border-4 border-green-500 rounded-[2rem] p-3 shadow-sm relative overflow-hidden">
           <input type="text" value={champName} onChange={e => setChampName(e.target.value)} className="w-full bg-white/50 font-black text-green-900 text-center mb-3 border-b-4 border-green-300 outline-none p-2 rounded-xl text-sm focus:bg-white" />
           <div className="flex flex-col gap-2 min-h-[150px]">
             {championIds.map(id => (
-              <div key={id} className="bg-green-500 text-white font-black p-2 rounded-xl flex justify-between items-center text-sm shadow-sm">
-                <span className="truncate">{playersMap[id]}</span>
+              <div key={id} className={`text-white font-black p-2 rounded-xl flex justify-between items-center text-sm shadow-sm transition-all ${champCaptainId === id ? 'bg-green-600 ring-2 ring-yellow-400' : 'bg-green-500'}`}>
+                <div className="flex items-center gap-1 truncate">
+                  <button onClick={() => setChampCaptainId(id)} className={`text-lg transition-transform active:scale-75 ${champCaptainId === id ? 'opacity-100' : 'opacity-30 grayscale hover:grayscale-0'}`} title="Passar a braçadeira">👑</button>
+                  <span className="truncate">{playersMap[id]}</span>
+                </div>
                 <button onClick={() => movePlayer(id, 'champ', 'pool')} className="bg-green-700 text-green-100 px-2 py-1 rounded-lg">✕</button>
               </div>
             ))}
           </div>
         </div>
+
+        {/* TIME B (VERMELHO) */}
         <div className="flex-1 bg-red-50 border-4 border-red-500 rounded-[2rem] p-3 shadow-sm relative overflow-hidden">
           <input type="text" value={challName} onChange={e => setChallName(e.target.value)} className="w-full bg-white/50 font-black text-red-900 text-center mb-3 border-b-4 border-red-300 outline-none p-2 rounded-xl text-sm focus:bg-white" />
           <div className="flex flex-col gap-2 min-h-[150px]">
             {challengerIds.map(id => (
-              <div key={id} className="bg-red-500 text-white font-black p-2 rounded-xl flex justify-between items-center text-sm shadow-sm">
-                <span className="truncate">{playersMap[id]}</span>
+              <div key={id} className={`text-white font-black p-2 rounded-xl flex justify-between items-center text-sm shadow-sm transition-all ${challCaptainId === id ? 'bg-red-600 ring-2 ring-yellow-400' : 'bg-red-500'}`}>
+                <div className="flex items-center gap-1 truncate">
+                  <button onClick={() => setChallCaptainId(id)} className={`text-lg transition-transform active:scale-75 ${challCaptainId === id ? 'opacity-100' : 'opacity-30 grayscale hover:grayscale-0'}`} title="Passar a braçadeira">👑</button>
+                  <span className="truncate">{playersMap[id]}</span>
+                </div>
                 <button onClick={() => movePlayer(id, 'chall', 'pool')} className="bg-red-700 text-red-100 px-2 py-1 rounded-lg">✕</button>
               </div>
             ))}
