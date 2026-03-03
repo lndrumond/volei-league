@@ -21,9 +21,10 @@ export default function Dashboard() {
 
   const loadData = useCallback(async () => {
     try {
+      // Puxa o Top 5 focando apenas no MÊS ATUAL (period=month)
       const [sessRes, rankRes] = await Promise.all([
         apiFetch(slug, `/api/sessions/active?slug=${slug}`),
-        apiFetch(slug, `/api/rankings/month?slug=${slug}`).catch(() => null) 
+        apiFetch(slug, `/api/rankings?slug=${slug}&period=month`).catch(() => null) 
       ]);
       
       if (sessRes && sessRes.ok) {
@@ -75,13 +76,9 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-green-100 p-4 pb-20 max-w-md mx-auto relative font-sans">
       
-      {/* HEADER COM MASCOTE E TEXTO ESTILIZADO VIBRANTE (NINTENDO STYLE) */}
       <header className="flex justify-between items-center mb-6 bg-white p-4 rounded-[2rem] shadow-sm border-b-8 border-green-200">
         <div className="flex items-center gap-3 flex-1">
-          {/* MASCOTE (A imagem apenas do boneco) */}
           <img src="/logo.png" alt="Mascote" className="h-16 object-contain drop-shadow-md" />
-          
-          {/* TEXTO ESTILIZADO E LEGÍVEL */}
           <div className="flex flex-col transform -rotate-2">
             <span className="font-black text-3xl tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-red-500 to-red-700 drop-shadow-[2px_2px_0_rgba(0,0,0,0.8)] leading-none mb-1">
               AMIGOS
@@ -126,12 +123,13 @@ export default function Dashboard() {
         <div className="absolute -right-4 -bottom-4 text-7xl opacity-5 pointer-events-none">🏐</div>
         <h3 className="text-xl font-black text-green-800 mb-4 flex justify-between items-center relative z-10">
           <span>🏆 Top 5 do Mês</span>
-          <button onClick={() => router.push(`/g/${slug}/ranking`)} className="text-sm font-bold text-blue-500 hover:text-blue-700">Ver tudo</button>
         </h3>
         <div className="flex flex-col gap-3 relative z-10">
           {rankings.slice(0, 5).map((r, i) => (
-            <div key={i} className="flex justify-between items-center bg-green-50 p-4 rounded-2xl border border-green-100 hover:bg-green-100 transition-colors">
-              <span className="font-black text-green-900 text-lg">#{i+1} {r.name}</span>
+            <div key={i} className="flex justify-between items-center bg-green-50 p-4 rounded-2xl border border-green-100">
+              <span className="font-black text-green-900 text-lg">
+                {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`} {r.name}
+              </span>
               <span className="bg-green-200 text-green-800 px-3 py-1 rounded-xl font-black">{r.points} pts</span>
             </div>
           ))}
@@ -143,8 +141,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <button onClick={() => router.push(`/g/${slug}/history`)} className="w-full bg-white text-gray-500 font-black py-4 rounded-2xl border-b-4 border-gray-200 active:translate-y-1 transition-transform">
-        VER HISTÓRICO 📜
+      <button onClick={() => router.push(`/g/${slug}/ranking`)} className="w-full bg-blue-500 text-white font-black text-xl py-5 rounded-[2rem] border-b-8 border-blue-700 active:translate-y-2 active:border-b-0 transition-all shadow-md flex justify-center items-center gap-2">
+        VER RANKING COMPLETO 🏆
       </button>
 
       {modalConfig.isOpen && (
