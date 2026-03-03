@@ -2,20 +2,37 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
 export async function POST(request: Request) {
-  const { slug, note, present_player_ids } = await request.json();
+  try {
+    const { slug } = await request.json();
 
-  const { data: group } = await supabase.from('groups').select('id').eq('slug', slug).single();
+    if (!slug) {
+      return NextResponse.json({ error: 'Faltou a liga' }, { status: 400 });
+    }
 
-  const { data: session, error } = await supabase
-    .from('sessions')
-    .insert({
-      group_id: group.id,
-      note,
-      present_player_ids
-    })
-    .select()
-    .single();
+    // Busca o ID do grupo
+    const { data: group } = await supabase
+      .from('groups')
+      .select('id')
+      .eq('slug', slug)
+      .single();
 
-  if (error) return NextResponse.json({ error: 'Erro ao criar rodada' }, { status: 500 });
-  return NextResponse.json({ ok: true, session });
+    // 🚨 A CORREÇÃO AQUI: Garante que o grupo existe antes de tentar criar a rodada!
+    if (!group) {
+      return NextResponse.json({ error: 'Liga não encontrada.' }, { status: 404 });
+    }
+
+    // Agora é seguro usar o group.id (coloquei a exclamação por garantia extrema)
+    const { data: session, error } = await supabase
+      .from('sessions')
+      .insert({ group_id: group!.id, status: 'active' })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return NextResponse.json({ ok: true, session });
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: 'Erro ao abrir a quadra.' }, { status: 500 });
+  }
 }
