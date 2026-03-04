@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { apiFetch, useAVLAuth } from '@/lib/avlClient';
+import { apiFetch } from '@/lib/avlClient';
 
 interface PlayerExt { id: string; name: string; is_guest?: boolean; }
 interface SessionData { 
@@ -18,7 +18,6 @@ interface RankingItem { name: string; points: number; }
 export default function Setup() {
   const { slug } = useParams() as { slug: string };
   const router = useRouter();
-  const { role } = useAVLAuth(slug);
   
   const [sessionInfo, setSessionInfo] = useState<SessionData | null>(null);
   const [allPlayers, setAllPlayers] = useState<PlayerExt[]>([]);
@@ -41,10 +40,6 @@ export default function Setup() {
   const [addingLate, setAddingLate] = useState(false);
   const [showAbortModal, setShowAbortModal] = useState(false);
 
-  useEffect(() => {
-    if (role !== 'admin' && role !== 'viewer') router.push(`/g/${slug}`);
-  }, [role, slug, router]);
-
   const loadData = () => {
     Promise.all([
       apiFetch(slug, `/api/sessions/active?slug=${slug}`),
@@ -53,6 +48,14 @@ export default function Setup() {
     ]).then(async ([sessRes, playRes, rankRes]) => {
       const sessData = await sessRes.json();
       const playData = await playRes.json();
+      
+      // 🚨 MÁGICA ANTI-TRAVAMENTO AQUI 🚨
+      // Se a rodada não existir ou der erro, avisa e volta, não trava a tela!
+      if (sessData.error || !sessData.session) {
+        alert("Ops! Erro na quadra: " + (sessData.error || "A rodada sumiu!"));
+        router.push(`/g/${slug}`);
+        return;
+      }
       
       const pMap: Record<string, string> = {};
       if (playData.players) {
@@ -71,30 +74,31 @@ export default function Setup() {
       }
       setRankingsMap(rMap);
       
-      // 🚨 CORREÇÃO DA AMNÉSIA: Carrega todo mundo que já estava na quadra!
-      if (sessData.session) {
-        setSessionInfo(sessData.session);
-        
-        const currentPresent = sessData.session.present_player_ids || [];
-        const champIds = sessData.session.champion_player_ids || [];
-        const challIds = sessData.session.challenger_player_ids || [];
-        
-        setChampionIds(champIds);
-        setChallengerIds(challIds);
-        
-        // Limpa o "(Cap: Nome)" para deixar o campo de texto bonitinho se for editar
-        if (sessData.session.champion_name) {
-          setChampName(sessData.session.champion_name.split(' (Cap:')[0].trim());
-        }
-        if (sessData.session.challenger_name) {
-          setChallName(sessData.session.challenger_name.split(' (Cap:')[0].trim());
-        }
-
-        const alreadyInTeams = [...champIds, ...challIds];
-        const onlyInPool = currentPresent.filter((id: string) => !alreadyInTeams.includes(id));
-        setPoolIds(onlyInPool);
+      setSessionInfo(sessData.session);
+      
+      const currentPresent = sessData.session.present_player_ids || [];
+      const champIds = sessData.session.champion_player_ids || [];
+      const challIds = sessData.session.challenger_player_ids || [];
+      
+      setChampionIds(champIds);
+      setChallengerIds(challIds);
+      
+      if (sessData.session.champion_name) {
+        setChampName(sessData.session.champion_name.split(' (Cap:')[0].trim());
       }
-    }).catch(err => console.error(err));
+      if (sessData.session.challenger_name) {
+        setChallName(sessData.session.challenger_name.split(' (Cap:')[0].trim());
+      }
+
+      const alreadyInTeams = [...champIds, ...challIds];
+      const onlyInPool = currentPresent.filter((id: string) => !alreadyInTeams.includes(id));
+      setPoolIds(onlyInPool);
+      
+    }).catch(err => {
+      console.error(err);
+      alert("Falha de conexão com a areia!");
+      router.push(`/g/${slug}`);
+    });
   };
 
   useEffect(() => { loadData(); }, [slug]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -115,7 +119,7 @@ export default function Setup() {
     }
   }, [challengerIds, challCaptainId]);
 
-  const handleAddLatecomer = async (existingId?: string, newName?: string) => {
+  const handleAddLatecomer = async (existingId?: string, newName?: string, isGuest: boolean = true) => {
     setAddingLate(true);
     let idToAdd = existingId;
 
@@ -123,7 +127,7 @@ export default function Setup() {
       if (newName && newName.trim() !== '') {
         const res = await apiFetch(slug, '/api/players/add', {
           method: 'POST',
-          body: JSON.stringify({ slug, name: newName.trim() })
+          body: JSON.stringify({ slug, name: newName.trim(), is_guest: isGuest })
         });
         const data = await res.json();
         if(data.error) throw new Error(data.error);
@@ -151,6 +155,24 @@ export default function Setup() {
       alert("Erro ao botar o pereba no jogo.");
     } finally {
       setAddingLate(false);
+    }
+  };
+
+  const handleToggleGuestStatus = async (e: React.MouseEvent, playerId: string, makeGuest: boolean) => {
+    e.stopPropagation();
+    try {
+      const res = await apiFetch(slug, '/api/players/update', {
+        method: 'PUT',
+        body: JSON.stringify({ player_id: playerId, is_guest: makeGuest })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setAllPlayers(prev => prev.map(p => p.id === playerId ? { ...p, is_guest: makeGuest } : p));
+      } else {
+        alert('Erro ao mudar o status.');
+      }
+    } catch (err) {
+      alert('Erro de conexão ao mudar status.');
     }
   };
 
@@ -271,7 +293,13 @@ export default function Setup() {
     }
   };
 
-  if (!sessionInfo) return <div className="min-h-screen bg-green-50 flex items-center justify-center"><h2 className="text-green-800 font-black text-2xl animate-pulse">Pintando as linhas da quadra... 🏐</h2></div>;
+  // 🚨 A TELA DE CARREGAMENTO AGORA CENTRALIZADA E CORRIGIDA 🚨
+  if (!sessionInfo) return (
+    <div className="min-h-screen bg-green-50 flex flex-col items-center justify-center p-4 text-center">
+      <h2 className="text-green-800 font-black text-3xl animate-pulse mb-6">Pintando as linhas da quadra...</h2>
+      <span className="text-6xl animate-bounce">🏐</span>
+    </div>
+  );
 
   const poolTitle = poolIds.length >= 5 ? `Time de Fora / Próximos (${poolIds.length})` : `Banco de Areia (${poolIds.length})`;
   
@@ -315,29 +343,52 @@ export default function Setup() {
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} />
               <div className="absolute top-full left-0 right-0 mt-2 bg-white border-4 border-orange-200 rounded-[1.5rem] shadow-xl overflow-hidden z-50 max-h-72 overflow-y-auto animate-in fade-in duration-200">
+                
                 {filteredFixos.length > 0 && (
                   <div className="p-2">
                     <div className="text-xs font-black text-gray-400 uppercase tracking-widest px-3 py-1">A Galera (Fixos)</div>
                     {filteredFixos.map(p => (
-                      <button key={p.id} onClick={() => handleAddLatecomer(p.id)} className="w-full text-left font-black text-green-900 bg-green-50 hover:bg-green-100 p-3 rounded-xl mb-1 active:scale-95 transition-transform">{p.name}</button>
+                      <div key={p.id} className="flex items-center bg-green-50 hover:bg-green-100 rounded-xl mb-1 px-1 transition-colors">
+                        <button onClick={() => handleAddLatecomer(p.id)} className="flex-1 text-left font-black text-green-900 p-3 active:scale-95 transition-transform">
+                          {p.name}
+                        </button>
+                        <button onClick={(e) => handleToggleGuestStatus(e, p.id, true)} className="p-2 text-xl hover:scale-110 transition-transform grayscale opacity-30 hover:grayscale-0 hover:opacity-100" title="Tornar Visitante">
+                          🧳
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}
+
                 {filteredGuests.length > 0 && (
                   <div className="p-2 border-t-2 border-gray-50">
                     <div className="text-xs font-black text-gray-400 uppercase tracking-widest px-3 py-1">Visitantes Antigos</div>
                     {filteredGuests.map(p => (
-                      <button key={p.id} onClick={() => handleAddLatecomer(p.id)} className="w-full text-left font-black text-orange-900 bg-orange-50 hover:bg-orange-100 p-3 rounded-xl mb-1 active:scale-95 transition-transform">{p.name}</button>
+                      <div key={p.id} className="flex items-center bg-orange-50 hover:bg-orange-100 rounded-xl mb-1 px-1 transition-colors">
+                        <button onClick={() => handleAddLatecomer(p.id)} className="flex-1 text-left font-black text-orange-900 p-3 active:scale-95 transition-transform">
+                          {p.name}
+                        </button>
+                        <button onClick={(e) => handleToggleGuestStatus(e, p.id, false)} className="p-2 text-xl hover:scale-110 transition-transform drop-shadow-sm" title="Promover a Fixo">
+                          ⭐
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}
+                
                 {searchTerm.trim() !== '' && !exactMatchExists && (
-                  <div className="p-2 border-t-4 border-orange-100 bg-orange-50">
-                    <button onClick={() => handleAddLatecomer(undefined, searchTerm)} className="w-full flex items-center justify-between text-left font-black text-white bg-orange-500 hover:bg-orange-600 p-4 rounded-xl active:scale-95 transition-transform shadow-sm">
-                      <span>Adicionar "{searchTerm}"</span><span className="bg-white text-orange-600 px-2 py-1 rounded-lg text-xs uppercase tracking-wider">+ Novo</span>
+                  <div className="p-3 border-t-4 border-orange-100 bg-orange-50 flex gap-2">
+                    <button onClick={() => handleAddLatecomer(undefined, searchTerm, false)} className="flex-1 flex flex-col items-center justify-center text-center font-black text-white bg-green-500 hover:bg-green-600 p-3 rounded-xl active:scale-95 transition-transform shadow-sm">
+                      <span className="text-xs uppercase opacity-80 mb-1">Adicionar</span>
+                      <span>Fixo 🤝</span>
+                    </button>
+                    <button onClick={() => handleAddLatecomer(undefined, searchTerm, true)} className="flex-1 flex flex-col items-center justify-center text-center font-black text-white bg-orange-500 hover:bg-orange-600 p-3 rounded-xl active:scale-95 transition-transform shadow-sm">
+                      <span className="text-xs uppercase opacity-80 mb-1">Adicionar</span>
+                      <span>Visitante 🧳</span>
                     </button>
                   </div>
                 )}
+
                 {filteredAbsent.length === 0 && searchTerm.trim() === '' && (
                   <div className="p-6 text-center text-gray-400 font-bold">Todo mundo já tá na quadra! 🙌</div>
                 )}

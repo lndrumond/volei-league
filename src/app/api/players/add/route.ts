@@ -3,29 +3,29 @@ import { supabase } from '@/lib/supabase';
 
 export async function POST(request: Request) {
   try {
-    const { slug, name } = await request.json();
+    // 🚨 AGORA A API RECEBE O is_guest DA TELA
+    const { slug, name, is_guest } = await request.json();
 
     if (!slug || !name) {
-      return NextResponse.json({ error: 'Faltam dados para adicionar o jogador.' }, { status: 400 });
+      return NextResponse.json({ error: 'Faltam dados.' }, { status: 400 });
     }
 
-    // Busca o ID do grupo
     const { data: group } = await supabase
       .from('groups')
       .select('id')
       .eq('slug', slug)
       .single();
 
-    // 🚨 AQUI ESTÁ A CORREÇÃO QUE A VERCEL QUERIA 🚨
-    // Garantimos pro TypeScript que o group existe! Se não existir, a gente barra aqui.
     if (!group) {
-      return NextResponse.json({ error: 'Liga não encontrada na areia.' }, { status: 404 });
+      return NextResponse.json({ error: 'Liga não encontrada.' }, { status: 404 });
     }
 
-    // Agora o TypeScript sabe que é seguro usar o group.id
+    // Define como verdadeiro apenas se a tela mandar true, senão vira Fixo (false)
+    const guestValue = is_guest !== undefined ? is_guest : true;
+
     const { data: player, error } = await supabase
       .from('players')
-      .insert({ group_id: group.id, name, is_guest: true, is_active: true })
+      .insert({ group_id: group!.id, name, is_guest: guestValue, is_active: true })
       .select('id, name, is_guest')
       .single();
 
