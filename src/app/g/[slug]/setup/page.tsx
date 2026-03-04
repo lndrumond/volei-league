@@ -5,13 +5,22 @@ import { useEffect, useState } from 'react';
 import { apiFetch, useAVLAuth } from '@/lib/avlClient';
 
 interface PlayerExt { id: string; name: string; is_guest?: boolean; }
+interface SessionData { 
+  id: string; 
+  present_player_ids: string[];
+  champion_player_ids: string[];
+  challenger_player_ids: string[];
+  champion_name: string;
+  challenger_name: string;
+}
+interface RankingItem { name: string; points: number; }
 
 export default function Setup() {
   const { slug } = useParams() as { slug: string };
   const router = useRouter();
   const { role } = useAVLAuth(slug);
   
-  const [sessionInfo, setSessionInfo] = useState<any>(null);
+  const [sessionInfo, setSessionInfo] = useState<SessionData | null>(null);
   const [allPlayers, setAllPlayers] = useState<PlayerExt[]>([]);
   const [playersMap, setPlayersMap] = useState<Record<string, string>>({});
   const [rankingsMap, setRankingsMap] = useState<Record<string, number>>({});
@@ -20,15 +29,13 @@ export default function Setup() {
   const [challengerIds, setChallengerIds] = useState<string[]>([]);
   const [poolIds, setPoolIds] = useState<string[]>([]); 
   
-  const [champName, setChampName] = useState('Sem Colete ');
-  const [challName, setChallName] = useState('Com Colete ');
+  const [champName, setChampName] = useState('Sem Colete');
+  const [challName, setChallName] = useState('Com Colete');
   const [saving, setSaving] = useState(false);
 
-  // ESTADOS DOS CAPITÃES 👑
   const [champCaptainId, setChampCaptainId] = useState<string | null>(null);
   const [challCaptainId, setChallCaptainId] = useState<string | null>(null);
 
-  // Atrasados (Smart Input)
   const [searchTerm, setSearchTerm] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [addingLate, setAddingLate] = useState(false);
@@ -47,11 +54,9 @@ export default function Setup() {
       const sessData = await sessRes.json();
       const playData = await playRes.json();
       
-      setSessionInfo(sessData.session);
-      setAllPlayers(playData.players || []);
-      
       const pMap: Record<string, string> = {};
       if (playData.players) {
+        setAllPlayers(playData.players);
         playData.players.forEach((p: PlayerExt) => { pMap[p.id] = p.name; });
       }
       setPlayersMap(pMap);
@@ -59,25 +64,41 @@ export default function Setup() {
       const rMap: Record<string, number> = {};
       if (rankRes && rankRes.ok) {
         const rankData = await rankRes.json();
-        rankData.rankings?.forEach((r: any) => {
+        rankData.rankings?.forEach((r: RankingItem) => {
           const player = playData.players?.find((p: PlayerExt) => p.name === r.name);
           if (player) rMap[player.id] = r.points;
         });
       }
       setRankingsMap(rMap);
       
-      if (sessData.session?.present_player_ids) {
-        const currentPresent = sessData.session.present_player_ids;
-        const alreadyInTeams = [...championIds, ...challengerIds];
+      // 🚨 CORREÇÃO DA AMNÉSIA: Carrega todo mundo que já estava na quadra!
+      if (sessData.session) {
+        setSessionInfo(sessData.session);
+        
+        const currentPresent = sessData.session.present_player_ids || [];
+        const champIds = sessData.session.champion_player_ids || [];
+        const challIds = sessData.session.challenger_player_ids || [];
+        
+        setChampionIds(champIds);
+        setChallengerIds(challIds);
+        
+        // Limpa o "(Cap: Nome)" para deixar o campo de texto bonitinho se for editar
+        if (sessData.session.champion_name) {
+          setChampName(sessData.session.champion_name.split(' (Cap:')[0].trim());
+        }
+        if (sessData.session.challenger_name) {
+          setChallName(sessData.session.challenger_name.split(' (Cap:')[0].trim());
+        }
+
+        const alreadyInTeams = [...champIds, ...challIds];
         const onlyInPool = currentPresent.filter((id: string) => !alreadyInTeams.includes(id));
         setPoolIds(onlyInPool);
       }
     }).catch(err => console.error(err));
   };
 
-  useEffect(() => { loadData(); }, [slug]);
+  useEffect(() => { loadData(); }, [slug]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Garante que o time sempre tenha um capitão válido se houver alguém no time
   useEffect(() => {
     if (championIds.length > 0 && (!champCaptainId || !championIds.includes(champCaptainId))) {
       setChampCaptainId(championIds[0]);
@@ -117,10 +138,12 @@ export default function Setup() {
       setPoolIds(newPool);
 
       const allPresentNow = [...championIds, ...challengerIds, ...newPool];
-      await apiFetch(slug, '/api/sessions/update-presence', {
-        method: 'POST',
-        body: JSON.stringify({ session_id: sessionInfo.id, present_player_ids: allPresentNow })
-      });
+      if (sessionInfo) {
+        await apiFetch(slug, '/api/sessions/update-presence', {
+          method: 'POST',
+          body: JSON.stringify({ session_id: sessionInfo.id, present_player_ids: allPresentNow })
+        });
+      }
 
       setSearchTerm('');
       setShowDropdown(false);
@@ -136,10 +159,12 @@ export default function Setup() {
     setPoolIds(newPool);
     const allPresentNow = [...championIds, ...challengerIds, ...newPool];
     try {
-      await apiFetch(slug, '/api/sessions/update-presence', {
-        method: 'POST',
-        body: JSON.stringify({ session_id: sessionInfo.id, present_player_ids: allPresentNow })
-      });
+      if (sessionInfo) {
+        await apiFetch(slug, '/api/sessions/update-presence', {
+          method: 'POST',
+          body: JSON.stringify({ session_id: sessionInfo.id, present_player_ids: allPresentNow })
+        });
+      }
     } catch (e) {
       console.error(e);
     }
@@ -202,6 +227,7 @@ export default function Setup() {
   };
 
   const executeAbort = async () => {
+    if (!sessionInfo) return;
     try {
       await apiFetch(slug, '/api/sessions/end', {
         method: 'POST',
@@ -216,9 +242,10 @@ export default function Setup() {
   const handleSave = async () => {
     if (!champName.trim() || !challName.trim()) return alert('Dá um nome pros times!');
     if (championIds.length === 0 || challengerIds.length === 0) return alert('Times vazios!');
+    if (!sessionInfo) return;
+    
     setSaving(true);
     try {
-      // MÁGICA DO CAPITÃO: Junta o nome do time com o nome do capitão selecionado!
       const finalChampName = champCaptainId ? `${champName.trim()} (Cap: ${playersMap[champCaptainId].split(' ')[0]})` : champName.trim();
       const finalChallName = challCaptainId ? `${challName.trim()} (Cap: ${playersMap[challCaptainId].split(' ')[0]})` : challName.trim();
 
@@ -258,16 +285,14 @@ export default function Setup() {
 
   return (
     <div className="min-h-screen bg-orange-50 p-4 pb-20 max-w-md mx-auto font-sans relative">
-      
       <div className="flex justify-between items-center mb-6">
-        <button onClick={() => router.push(`/g/${slug}`)} className="text-orange-800 font-black flex items-center gap-2">
+        <button onClick={() => router.push(`/g/${slug}`)} className="text-orange-800 font-black flex items-center gap-2 transition-colors hover:text-orange-600">
           <span>◀</span> Sair
         </button>
-        <button onClick={() => setShowAbortModal(true)} className="text-red-500 bg-red-100 px-3 py-2 rounded-xl font-black text-sm border-b-4 border-red-200 active:translate-y-1">
+        <button onClick={() => setShowAbortModal(true)} className="text-red-500 bg-red-100 px-3 py-2 rounded-xl font-black text-sm border-b-4 border-red-200 active:translate-y-1 transition-all shadow-sm">
           🛑 Abortar Rodada
         </button>
       </div>
-      
       <h1 className="text-3xl font-black text-orange-900 mb-6 text-center leading-tight">
         Tirando os<br/><span className="text-orange-500">Times</span> 🤼
       </h1>
@@ -281,7 +306,7 @@ export default function Setup() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onFocus={() => setShowDropdown(true)}
-            className="w-full bg-gray-50 border-4 border-gray-100 rounded-2xl p-4 font-black text-gray-700 outline-none focus:border-orange-500 focus:bg-white transition-all"
+            className="w-full bg-gray-50 border-4 border-gray-100 rounded-2xl p-4 font-black text-gray-700 outline-none focus:border-orange-500 focus:bg-white transition-all shadow-inner"
             disabled={addingLate}
           />
           {addingLate && <span className="absolute right-4 top-4 text-orange-500 animate-spin">⏳</span>}
@@ -289,7 +314,7 @@ export default function Setup() {
           {showDropdown && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} />
-              <div className="absolute top-full left-0 right-0 mt-2 bg-white border-4 border-orange-200 rounded-[1.5rem] shadow-xl overflow-hidden z-50 max-h-72 overflow-y-auto">
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white border-4 border-orange-200 rounded-[1.5rem] shadow-xl overflow-hidden z-50 max-h-72 overflow-y-auto animate-in fade-in duration-200">
                 {filteredFixos.length > 0 && (
                   <div className="p-2">
                     <div className="text-xs font-black text-gray-400 uppercase tracking-widest px-3 py-1">A Galera (Fixos)</div>
@@ -326,18 +351,17 @@ export default function Setup() {
         ⚖️ SORTEIO BALANCEADO
       </button>
 
-      {/* BANCO DE AREIA */}
       {poolIds.length > 0 && (
         <div className="bg-white p-5 rounded-[2rem] mb-6 border-4 border-orange-200 shadow-sm relative z-10">
           <h3 className="font-black text-gray-400 mb-3 text-lg">{poolTitle}</h3>
           <div className="flex flex-wrap gap-3">
             {poolIds.map(id => (
-              <div key={id} className="bg-gray-100 pl-4 pr-2 py-2 rounded-2xl flex items-center gap-2 shadow-sm border-2 border-gray-200">
+              <div key={id} className="bg-gray-100 pl-4 pr-2 py-2 rounded-2xl flex items-center gap-2 shadow-sm border-2 border-gray-200 hover:bg-gray-50 transition-colors">
                 <span className="font-black text-gray-800 text-lg whitespace-nowrap">{playersMap[id] || 'Pereba'}</span>
                 <div className="flex gap-1 ml-1">
                   <button onClick={() => movePlayer(id, 'pool', 'champ')} className="bg-green-100 text-green-600 px-3 py-1 rounded-xl font-black text-xl active:scale-95 transition-transform">◀</button>
                   <button onClick={() => movePlayer(id, 'pool', 'chall')} className="bg-red-100 text-red-600 px-3 py-1 rounded-xl font-black text-xl active:scale-95 transition-transform">▶</button>
-                  <button onClick={() => handleRemoveFromSession(id)} className="bg-gray-200 text-gray-500 hover:bg-red-200 hover:text-red-600 px-2 py-1 rounded-lg font-black text-lg active:scale-95 transition-colors ml-1" title="Mandar pro chuveiro">🗑️</button>
+                  <button onClick={() => handleRemoveFromSession(id)} className="bg-gray-200 text-gray-500 hover:bg-red-200 hover:text-red-600 px-2 py-1 rounded-lg font-black text-lg active:scale-95 transition-colors ml-1 shadow-sm" title="Mandar pro chuveiro">🗑️</button>
                 </div>
               </div>
             ))}
@@ -346,33 +370,31 @@ export default function Setup() {
       )}
 
       <div className="flex gap-4 mb-8 relative z-10">
-        {/* TIME A (VERDE) */}
         <div className="flex-1 bg-green-50 border-4 border-green-500 rounded-[2rem] p-3 shadow-sm relative overflow-hidden">
-          <input type="text" value={champName} onChange={e => setChampName(e.target.value)} className="w-full bg-white/50 font-black text-green-900 text-center mb-3 border-b-4 border-green-300 outline-none p-2 rounded-xl text-sm focus:bg-white" />
+          <input type="text" value={champName} onChange={e => setChampName(e.target.value)} className="w-full bg-white/50 font-black text-green-900 text-center mb-3 border-b-4 border-green-300 outline-none p-2 rounded-xl text-sm focus:bg-white transition-colors" />
           <div className="flex flex-col gap-2 min-h-[150px]">
             {championIds.map(id => (
-              <div key={id} className={`text-white font-black p-2 rounded-xl flex justify-between items-center text-sm shadow-sm transition-all ${champCaptainId === id ? 'bg-green-600 ring-2 ring-yellow-400' : 'bg-green-500'}`}>
+              <div key={id} className={`text-white font-black p-2 rounded-xl flex justify-between items-center text-sm shadow-sm transition-all ${champCaptainId === id ? 'bg-green-600 ring-2 ring-yellow-400 scale-[1.02]' : 'bg-green-500 hover:bg-green-600'}`}>
                 <div className="flex items-center gap-1 truncate">
                   <button onClick={() => setChampCaptainId(id)} className={`text-lg transition-transform active:scale-75 ${champCaptainId === id ? 'opacity-100' : 'opacity-30 grayscale hover:grayscale-0'}`} title="Passar a braçadeira">👑</button>
                   <span className="truncate">{playersMap[id]}</span>
                 </div>
-                <button onClick={() => movePlayer(id, 'champ', 'pool')} className="bg-green-700 text-green-100 px-2 py-1 rounded-lg">✕</button>
+                <button onClick={() => movePlayer(id, 'champ', 'pool')} className="bg-green-700 text-green-100 px-2 py-1 rounded-lg transition-colors hover:bg-green-800 shadow-sm">✕</button>
               </div>
             ))}
           </div>
         </div>
 
-        {/* TIME B (VERMELHO) */}
         <div className="flex-1 bg-red-50 border-4 border-red-500 rounded-[2rem] p-3 shadow-sm relative overflow-hidden">
-          <input type="text" value={challName} onChange={e => setChallName(e.target.value)} className="w-full bg-white/50 font-black text-red-900 text-center mb-3 border-b-4 border-red-300 outline-none p-2 rounded-xl text-sm focus:bg-white" />
+          <input type="text" value={challName} onChange={e => setChallName(e.target.value)} className="w-full bg-white/50 font-black text-red-900 text-center mb-3 border-b-4 border-red-300 outline-none p-2 rounded-xl text-sm focus:bg-white transition-colors" />
           <div className="flex flex-col gap-2 min-h-[150px]">
             {challengerIds.map(id => (
-              <div key={id} className={`text-white font-black p-2 rounded-xl flex justify-between items-center text-sm shadow-sm transition-all ${challCaptainId === id ? 'bg-red-600 ring-2 ring-yellow-400' : 'bg-red-500'}`}>
+              <div key={id} className={`text-white font-black p-2 rounded-xl flex justify-between items-center text-sm shadow-sm transition-all ${challCaptainId === id ? 'bg-red-600 ring-2 ring-yellow-400 scale-[1.02]' : 'bg-red-500 hover:bg-red-600'}`}>
                 <div className="flex items-center gap-1 truncate">
                   <button onClick={() => setChallCaptainId(id)} className={`text-lg transition-transform active:scale-75 ${challCaptainId === id ? 'opacity-100' : 'opacity-30 grayscale hover:grayscale-0'}`} title="Passar a braçadeira">👑</button>
                   <span className="truncate">{playersMap[id]}</span>
                 </div>
-                <button onClick={() => movePlayer(id, 'chall', 'pool')} className="bg-red-700 text-red-100 px-2 py-1 rounded-lg">✕</button>
+                <button onClick={() => movePlayer(id, 'chall', 'pool')} className="bg-red-700 text-red-100 px-2 py-1 rounded-lg transition-colors hover:bg-red-800 shadow-sm">✕</button>
               </div>
             ))}
           </div>
@@ -383,7 +405,6 @@ export default function Setup() {
         {saving ? 'Anotando na areia...' : 'BOLA PRO ALTO! 🏐'}
       </button>
 
-      {/* MODAL CÔMICO DE ABORTAR */}
       {showAbortModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-sm shadow-2xl border-b-8 border-red-500 animate-in zoom-in duration-200 text-center">
@@ -392,7 +413,7 @@ export default function Setup() {
             <p className="text-gray-500 font-bold mb-6">Tem certeza? O juiz já tava passando protetor solar!</p>
             <div className="flex flex-col gap-3">
               <button onClick={executeAbort} className="bg-red-500 text-white text-2xl font-black py-4 rounded-2xl border-b-8 border-red-700 active:border-b-0 active:translate-y-2 transition-all">Sim, furou! 🛑</button>
-              <button onClick={() => setShowAbortModal(false)} className="bg-gray-100 text-gray-600 text-xl font-black py-4 rounded-2xl border-b-4 border-gray-300 active:translate-y-1">Não, bora pro jogo! 🏐</button>
+              <button onClick={() => setShowAbortModal(false)} className="bg-gray-100 text-gray-600 text-xl font-black py-4 rounded-2xl border-b-4 border-gray-300 active:translate-y-1 transition-all">Não, bora pro jogo! 🏐</button>
             </div>
           </div>
         </div>

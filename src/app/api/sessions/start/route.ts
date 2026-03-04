@@ -3,7 +3,8 @@ import { supabase } from '@/lib/supabase';
 
 export async function POST(request: Request) {
   try {
-    const { slug } = await request.json();
+    // 🚨 AQUI ESTAVA O ERRO! Adicionei o "present_player_ids" para a API ler a lista
+    const { slug, present_player_ids } = await request.json();
 
     if (!slug) {
       return NextResponse.json({ error: 'Faltou a liga' }, { status: 400 });
@@ -16,15 +17,19 @@ export async function POST(request: Request) {
       .eq('slug', slug)
       .single();
 
-    // 🚨 A CORREÇÃO AQUI: Garante que o grupo existe antes de tentar criar a rodada!
+    // Leão de chácara do TypeScript (impede a Vercel de travar)
     if (!group) {
       return NextResponse.json({ error: 'Liga não encontrada.' }, { status: 404 });
     }
 
-    // Agora é seguro usar o group.id (coloquei a exclamação por garantia extrema)
+    // Insere a rodada no banco já com os jogadores marcados!
     const { data: session, error } = await supabase
       .from('sessions')
-      .insert({ group_id: group!.id, status: 'active' })
+      .insert({ 
+        group_id: group!.id, 
+        status: 'active',
+        present_player_ids: present_player_ids || [] // 🚨 SALVA OS CHECKBOXES!
+      })
       .select()
       .single();
 
