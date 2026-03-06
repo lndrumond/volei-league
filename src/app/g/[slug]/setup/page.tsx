@@ -40,19 +40,21 @@ export default function Setup() {
   const [addingLate, setAddingLate] = useState(false);
   const [showAbortModal, setShowAbortModal] = useState(false);
 
-  const loadData = () => {
-    Promise.all([
-      apiFetch(slug, `/api/sessions/active?slug=${slug}`),
-      apiFetch(slug, `/api/players/list?slug=${slug}`),
-      apiFetch(slug, `/api/rankings/month?slug=${slug}`).catch(() => null)
-    ]).then(async ([sessRes, playRes, rankRes]) => {
+  // 🚨 1. CARREGAMENTO BLINDADO E URL DO RANKING CORRIGIDA 🚨
+  const loadData = async () => {
+    try {
+      const [sessRes, playRes, rankRes] = await Promise.all([
+        apiFetch(slug, `/api/sessions/active?slug=${slug}`),
+        apiFetch(slug, `/api/players/list?slug=${slug}`),
+        // AQUI ESTAVA O ERRO! Agora a URL do ranking está correta:
+        apiFetch(slug, `/api/rankings?slug=${slug}&period=month`).catch(() => null) 
+      ]);
+
       const sessData = await sessRes.json();
       const playData = await playRes.json();
       
-      // 🚨 MÁGICA ANTI-TRAVAMENTO AQUI 🚨
-      // Se a rodada não existir ou der erro, avisa e volta, não trava a tela!
       if (sessData.error || !sessData.session) {
-        alert("Ops! Erro na quadra: " + (sessData.error || "A rodada sumiu!"));
+        alert("Ops! Erro na quadra: " + (sessData.error || "Nenhuma rodada ativa!"));
         router.push(`/g/${slug}`);
         return;
       }
@@ -94,11 +96,11 @@ export default function Setup() {
       const onlyInPool = currentPresent.filter((id: string) => !alreadyInTeams.includes(id));
       setPoolIds(onlyInPool);
       
-    }).catch(err => {
+    } catch (err) {
       console.error(err);
-      alert("Falha de conexão com a areia!");
+      alert("Falha de conexão com a areia! Tente novamente.");
       router.push(`/g/${slug}`);
-    });
+    }
   };
 
   useEffect(() => { loadData(); }, [slug]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -207,44 +209,69 @@ export default function Setup() {
     adders[to]();
   };
 
+  // 🚨 2. A MATEMÁTICA PERFEITA (ALGORITMO DE BALANCEAMENTO DE PONTOS) 🚨
   const handleBalancedRandomize = () => {
     const allPresent = [...poolIds, ...championIds, ...challengerIds];
     if (allPresent.length < 4) return alert('Tem pouca gente pra sortear!');
 
+    // Embaralha para evitar panelinhas com pontuações iguais
     const shuffled = [...allPresent].sort(() => Math.random() - 0.5);
+    
     let playing: string[] = [];
     let bench: string[] = [];
 
     if (shuffled.length <= 12) {
       playing = shuffled;
-    } else if (shuffled.length === 13) {
-      playing = shuffled.slice(0, 12);
-      bench = shuffled.slice(12);
     } else {
       playing = shuffled.slice(0, 12);
       bench = shuffled.slice(12);
     }
 
+    // Ordena do Melhor pro Pior
     playing.sort((a, b) => (rankingsMap[b] || 0) - (rankingsMap[a] || 0));
 
     const champ: string[] = [];
     const chall: string[] = [];
     let champPts = 0;
     let challPts = 0;
+    const maxPerTeam = Math.ceil(playing.length / 2);
 
+    // Lógica Gulosa: Manda o jogador para o time que tem MENOS pontos!
     playing.forEach(playerId => {
       const pts = rankingsMap[playerId] || 0;
-      if (champPts <= challPts && champ.length < 6) {
+
+      if (champ.length < maxPerTeam && chall.length < maxPerTeam) {
+        
+        if (champPts < challPts) {
+          champ.push(playerId); champPts += pts;
+        } else if (challPts < champPts) {
+          chall.push(playerId); challPts += pts;
+        } else {
+          // Se os pontos estão empatados, manda pra quem tem menos gente
+          if (champ.length <= chall.length) {
+            champ.push(playerId); champPts += pts;
+          } else {
+            chall.push(playerId); challPts += pts;
+          }
+        }
+
+      } else if (champ.length < maxPerTeam) {
         champ.push(playerId); champPts += pts;
-      } else if (chall.length < 6) {
-        chall.push(playerId); challPts += pts;
       } else {
-        champ.push(playerId); champPts += pts;
+        chall.push(playerId); challPts += pts;
       }
     });
 
-    setChampionIds(champ);
-    setChallengerIds(chall);
+    // 🚨 3. A MOEDA DA SORTE (Acaba com o vício de cor dos times) 🚨
+    const coinFlip = Math.random() > 0.5;
+    if (coinFlip) {
+      setChampionIds(chall);
+      setChallengerIds(champ);
+    } else {
+      setChampionIds(champ);
+      setChallengerIds(chall);
+    }
+    
     setPoolIds(bench);
   };
 
@@ -293,7 +320,7 @@ export default function Setup() {
     }
   };
 
-  // 🚨 A TELA DE CARREGAMENTO AGORA CENTRALIZADA E CORRIGIDA 🚨
+  // Se der tela branca, isso aqui segura a onda bonitinho:
   if (!sessionInfo) return (
     <div className="min-h-screen bg-green-50 flex flex-col items-center justify-center p-4 text-center">
       <h2 className="text-green-800 font-black text-3xl animate-pulse mb-6">Pintando as linhas da quadra...</h2>
