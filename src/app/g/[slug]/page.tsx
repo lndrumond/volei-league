@@ -12,6 +12,12 @@ export default function Dashboard() {
   const { role, refreshAuth } = useAVLAuth(slug);
   
   const [session, setSession] = useState<SessionData | null>(null);
+  const [activeSession, setActiveSession] = useState<any | null>(null);
+  const [lastEndedSession, setLastEndedSession] = useState<any | null>(null);
+  // 🚨 Estado para guardar o placar (sets) 🚨
+  const [sessionSets, setSessionSets] = useState<any[]>([]);
+  const [playersMap, setPlayersMap] = useState<Record<string, string>>({});
+
   const [rankings, setRankings] = useState<RankingItem[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
@@ -21,19 +27,33 @@ export default function Dashboard() {
 
   const loadData = useCallback(async () => {
     try {
-      // Puxa o Top 5 focando apenas no MÊS ATUAL (period=month)
-      const [sessRes, rankRes] = await Promise.all([
+      const [sessRes, rankRes, playRes] = await Promise.all([
         apiFetch(slug, `/api/sessions/active?slug=${slug}`),
-        apiFetch(slug, `/api/rankings?slug=${slug}&period=month`).catch(() => null) 
+        apiFetch(slug, `/api/rankings?slug=${slug}&period=month`).catch(() => null),
+        apiFetch(slug, `/api/players/list?slug=${slug}`).catch(() => null)
       ]);
       
+      if (playRes && playRes.ok) {
+        const playData = await playRes.json();
+        const pMap: Record<string, string> = {};
+        playData.players?.forEach((p: { id: string; name: string }) => {
+          pMap[p.id] = p.name;
+        });
+        setPlayersMap(pMap);
+      }
+
       if (sessRes && sessRes.ok) {
         const sessData = await sessRes.json();
+        
         if (sessData.session && sessData.session.id) {
           setSession(sessData.session);
         } else {
           setSession(null);
         }
+
+        setActiveSession(sessData.activeSession || null);
+        setLastEndedSession(sessData.lastEndedSession || null);
+        setSessionSets(sessData.sets || []); // Salva os sets para calcularmos o placar
       }
       
       if (rankRes && rankRes.ok) {
@@ -68,6 +88,32 @@ export default function Dashboard() {
     alert('Você saiu da quadra. PIN resetado!');
   };
 
+  const getTeamNamesArray = (ids?: string[]) => {
+    if (!ids || ids.length === 0) return [];
+    return ids.map(id => playersMap[id] || 'Jogador Misterioso');
+  };
+
+  const formatMatchDate = (dateString: string) => {
+    const d = new Date(dateString);
+    return d.toLocaleDateString('pt-BR', { 
+      day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' 
+    }).replace(',', ' às');
+  };
+
+// 🚨 Cálculo Dinâmico do Placar (Lendo a coluna 'winner') 🚨
+  let champScore = 0;
+  let challScore = 0;
+  const currentSession = activeSession || lastEndedSession;
+
+  sessionSets.forEach(s => {
+    // Verifica se o winner foi salvo como 'champion', ou com o nome exato do time
+    if (s.winner === 'champion' || s.winner === currentSession?.champion_name) {
+      champScore++;
+    } else if (s.winner === 'challenger' || s.winner === currentSession?.challenger_name) {
+      challScore++;
+    }
+  });
+
   if (loadingData) return <LoadingScreen />;
 
   const hasSession = Boolean(session && session.id);
@@ -95,7 +141,7 @@ export default function Dashboard() {
         )}
       </header>
 
-      <div className={`p-6 rounded-[2rem] shadow-lg border-b-8 mb-6 transition-colors ${hasSession ? 'bg-orange-500 border-orange-700' : 'bg-white border-green-300'}`}>
+      <div className={`p-6 rounded-[2rem] shadow-lg border-b-8 mb-5 transition-colors ${hasSession ? 'bg-orange-500 border-orange-700' : 'bg-white border-green-300'}`}>
         <h2 className={`text-2xl font-black mb-5 flex items-center gap-2 ${hasSession ? 'text-white' : 'text-green-800'}`}>
           {hasSession ? '🔥 A areia tá voando!' : '💤 Quadra livre...'}
         </h2>
@@ -118,6 +164,104 @@ export default function Dashboard() {
           </button>
         )}
       </div>
+
+      {/* ========================================= */}
+      {/* 🚨 CARDS MAIS COMPACTOS E DIRETOS 🚨 */}
+      {/* ========================================= */}
+      
+      {/* CARD 1: AO VIVO */}
+      {(activeSession && activeSession.champion_name) && (
+        <div 
+          onClick={() => handleProtectedAction('viewer', `/g/${slug}/game`)}
+          className="bg-white rounded-[1.5rem] p-4 shadow-md border-b-4 border-red-300 mb-5 relative cursor-pointer active:scale-95 transition-transform"
+        >
+          <div className="flex justify-between items-center mb-3 border-b border-red-50 pb-2">
+            <div className="flex items-center gap-1.5">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+              </span>
+              <span className="text-red-600 font-black text-[11px] tracking-widest uppercase">AO VIVO</span>
+            </div>
+            {/* Placar parcial */}
+            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50 px-2 rounded-md">
+               Sets: {champScore} - {challScore}
+            </div>
+          </div>
+
+          <div className="flex justify-between items-start text-center gap-2">
+            <div className="flex-1">
+              <h3 className="font-black text-green-700 text-sm leading-tight uppercase mb-1">{activeSession.champion_name}</h3>
+              <div className="flex flex-col">
+                {getTeamNamesArray(activeSession.champion_player_ids).map((name, idx) => (
+                  <span key={idx} className="text-[10px] text-gray-500 font-bold leading-tight">{name}</span>
+                ))}
+              </div>
+            </div>
+            
+            <div className="flex flex-col items-center pt-2">
+              <span className="text-sm font-black text-gray-300">VS</span>
+            </div>
+
+            <div className="flex-1">
+              <h3 className="font-black text-orange-600 text-sm leading-tight uppercase mb-1">{activeSession.challenger_name}</h3>
+              <div className="flex flex-col">
+                {getTeamNamesArray(activeSession.challenger_player_ids).map((name, idx) => (
+                  <span key={idx} className="text-[10px] text-gray-500 font-bold leading-tight">{name}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CARD 2: ÚLTIMO CONFRONTO (MAIS COMPACTO, COM PLACAR DE SETS) */}
+      {(!activeSession && lastEndedSession && lastEndedSession.champion_name) && (
+        <div className="bg-white rounded-[1.5rem] p-4 shadow-md border-b-4 border-sky-200 mb-5 relative">
+          
+          <div className="flex justify-between items-center mb-3 border-b border-sky-50 pb-2">
+            <span className="text-sky-600 font-black text-[11px] tracking-widest uppercase">ÚLTIMO CONFRONTO</span>
+            {lastEndedSession.created_at && (
+              <span className="text-[10px] text-gray-400 font-bold tracking-wide">
+                {formatMatchDate(lastEndedSession.created_at)}
+              </span>
+            )}
+          </div>
+
+          <div className="flex justify-between items-center text-center gap-1">
+            {/* TIME A */}
+            <div className="flex-1">
+              <h3 className="font-black text-green-700 text-sm leading-tight uppercase">{lastEndedSession.champion_name}</h3>
+              <div className="flex flex-col mt-1">
+                {getTeamNamesArray(lastEndedSession.champion_player_ids).map((name, idx) => (
+                  <span key={idx} className="text-[10px] text-gray-500 font-bold leading-tight">{name}</span>
+                ))}
+              </div>
+            </div>
+            
+            {/* PLACAR DE SETS CENTRALIZADO */}
+            <div className="flex flex-col items-center px-2">
+              <div className="bg-sky-50 text-sky-800 font-black text-xl px-3 py-1 rounded-xl shadow-sm border border-sky-100 flex items-center gap-1">
+                <span>{champScore}</span>
+                <span className="text-[11px] text-sky-400 uppercase tracking-widest px-1">x</span>
+                <span>{challScore}</span>
+              </div>
+              <span className="text-[9px] text-sky-500 font-bold uppercase mt-1 tracking-widest">Sets</span>
+            </div>
+
+            {/* TIME B */}
+            <div className="flex-1">
+              <h3 className="font-black text-orange-600 text-sm leading-tight uppercase">{lastEndedSession.challenger_name}</h3>
+              <div className="flex flex-col mt-1">
+                {getTeamNamesArray(lastEndedSession.challenger_player_ids).map((name, idx) => (
+                  <span key={idx} className="text-[10px] text-gray-500 font-bold leading-tight">{name}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ========================================= */}
 
       <div className="bg-white rounded-[2rem] p-5 shadow-sm border-b-8 border-green-200 mb-6 relative overflow-hidden">
         <div className="absolute -right-4 -bottom-4 text-7xl opacity-5 pointer-events-none">🏐</div>
