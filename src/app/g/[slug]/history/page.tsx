@@ -72,11 +72,18 @@ export default function HistoryPage() {
     return ids.map(id => playersMap[id] || 'Misterioso');
   };
 
-  const formatMatchDate = (dateString: string) => {
-    const d = new Date(dateString);
-    return d.toLocaleDateString('pt-BR', { 
-      day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' 
-    }).replace(',', ' às');
+  // 🚨 NOVA FUNÇÃO: Formata com Início e Fim 🚨
+  const formatMatchDuration = (startString: string, endString?: string) => {
+    const start = new Date(startString);
+    const datePart = start.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    const startTime = start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+    if (!endString) return `${datePart} • ${startTime}`;
+
+    const end = new Date(endString);
+    const endTime = end.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+    return `${datePart} • ${startTime} às ${endTime}`;
   };
 
   const applyQuickFilter = (type: 'hoje' | 'ontem' | 'semana') => {
@@ -113,8 +120,7 @@ export default function HistoryPage() {
   return (
     <div className="min-h-screen bg-green-100 p-4 pb-20 max-w-md mx-auto relative font-sans">
       
-      {/* 🚨 ÁREA FIXA NO TOPO (STICKY) 🚨 
-          Isso faz com que o menu e o filtro não sumam quando você rola a tela pra baixo */}
+      {/* 🚨 ÁREA FIXA NO TOPO (STICKY) 🚨 */}
       <div className="sticky top-0 z-50 bg-green-100/95 backdrop-blur-sm pt-2 pb-2 -mx-2 px-2 border-b-2 border-green-200/50 shadow-sm mb-4">
         
         {/* CABEÇALHO DIVERTIDO (MAIS COMPACTO) */}
@@ -203,11 +209,12 @@ export default function HistoryPage() {
             const winner = champScore > challScore ? 'champion' : (challScore > champScore ? 'challenger' : 'draw');
 
             return (
-              // 🚨 CARDS MAIS COMPACTOS E OTIMIZADOS 🚨
+              // 🚨 CARDS COMPACTOS E OTIMIZADOS 🚨
               <div key={session.id} className="bg-white rounded-[1.5rem] p-3 shadow-md border-b-4 border-gray-200 relative overflow-hidden">
                 <div className="flex justify-between items-center mb-2.5 border-b border-dashed border-gray-100 pb-2">
                   <span className="text-[9px] bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full font-black uppercase tracking-wider">
-                    {formatMatchDate(session.ended_at || session.created_at)}
+                    {/* 🚨 DURAÇÃO APLICADA AQUI 🚨 */}
+                    ⏱️ {formatMatchDuration(session.created_at, session.ended_at)}
                   </span>
                   <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
                     <span>🏁</span>
@@ -222,7 +229,6 @@ export default function HistoryPage() {
                         {session.champion_name}
                       </h3>
                     </div>
-                    {/* 🚨 NOMES COMPLETOS: Letra um pouco menor, quebra de linha ativada 🚨 */}
                     <div className="flex flex-col gap-0.5 flex-1 justify-center">
                       {getTeamNamesArray(session.champion_player_ids).map((name, idx) => (
                         <span key={idx} className="text-[9px] text-gray-700 font-bold leading-none my-0.5 break-words">
@@ -247,7 +253,6 @@ export default function HistoryPage() {
                         {session.challenger_name}
                       </h3>
                     </div>
-                    {/* 🚨 NOMES COMPLETOS: Letra um pouco menor, quebra de linha ativada 🚨 */}
                     <div className="flex flex-col gap-0.5 flex-1 justify-center">
                       {getTeamNamesArray(session.challenger_player_ids).map((name, idx) => (
                         <span key={idx} className="text-[9px] text-gray-700 font-bold leading-none my-0.5 break-words">
