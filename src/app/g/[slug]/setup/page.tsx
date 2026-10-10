@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/avlClient';
 
-interface PlayerExt { id: string; name: string; is_guest?: boolean; }
+interface PlayerExt { id: string; name: string; is_guest?: boolean; skill_rating?: number; }
 interface SessionData { 
   id: string; 
   present_player_ids: string[];
@@ -23,6 +23,7 @@ export default function Setup() {
   const [allPlayers, setAllPlayers] = useState<PlayerExt[]>([]);
   const [playersMap, setPlayersMap] = useState<Record<string, string>>({});
   const [rankingsMap, setRankingsMap] = useState<Record<string, number>>({});
+  const [skillsMap, setSkillsMap] = useState<Record<string, number>>({});
   
   const [championIds, setChampionIds] = useState<string[]>([]);
   const [challengerIds, setChallengerIds] = useState<string[]>([]);
@@ -60,11 +61,16 @@ export default function Setup() {
       }
       
       const pMap: Record<string, string> = {};
+      const sMap: Record<string, number> = {};
       if (playData.players) {
         setAllPlayers(playData.players);
-        playData.players.forEach((p: PlayerExt) => { pMap[p.id] = p.name; });
+        playData.players.forEach((p: PlayerExt) => {
+          pMap[p.id] = p.name;
+          sMap[p.id] = typeof p.skill_rating === 'number' ? p.skill_rating : 5.0;
+        });
       }
       setPlayersMap(pMap);
+      setSkillsMap(sMap);
 
       const rMap: Record<string, number> = {};
       if (rankRes && rankRes.ok) {
@@ -209,12 +215,26 @@ export default function Setup() {
     adders[to]();
   };
 
-  // 🚨 2. A MATEMÁTICA PERFEITA (ALGORITMO DE BALANCEAMENTO DE PONTOS) 🚨
+  // 🚨 CHAVE PARA EXIBIR/OCULTAR LOGS DE RATING NO CONSOLE DO NAVEGADOR
+  const DEBUG_SHOW_RATINGS = true;
+
+  // Função auxiliar para gerar combinações de k elementos a partir de um array
+  const getKCombinations = <T,>(arr: T[], k: number): T[][] => {
+    if (k === 0) return [[]];
+    if (arr.length === 0) return [];
+    const head = arr[0];
+    const tail = arr.slice(1);
+    const withHead = getKCombinations(tail, k - 1).map(c => [head, ...c]);
+    const withoutHead = getKCombinations(tail, k);
+    return [...withHead, ...withoutHead];
+  };
+
+  // 🚨 2. A MATEMÁTICA PERFEITA (ALGORITMO COMBINATÓRIO VARIÁVEL & BALANCEADO) 🚨
   const handleBalancedRandomize = () => {
     const allPresent = [...poolIds, ...championIds, ...challengerIds];
     if (allPresent.length < 4) return alert('Tem pouca gente pra sortear!');
 
-    // Embaralha para evitar panelinhas com pontuações iguais
+    // Embaralha inicialmente para diversificar caso haja mais de 12 jogadores
     const shuffled = [...allPresent].sort(() => Math.random() - 0.5);
     
     let playing: string[] = [];
@@ -227,52 +247,78 @@ export default function Setup() {
       bench = shuffled.slice(12);
     }
 
-    // Ordena do Melhor pro Pior
-    playing.sort((a, b) => (rankingsMap[b] || 0) - (rankingsMap[a] || 0));
+    const getSkill = (id: string) => skillsMap[id] ?? 5.0;
+    const teamASize = Math.floor(playing.length / 2);
 
-    const champ: string[] = [];
-    const chall: string[] = [];
-    let champPts = 0;
-    let challPts = 0;
-    const maxPerTeam = Math.ceil(playing.length / 2);
+    // 1. Gera todas as combinações de escolha para o Time A
+    const allACombos = getKCombinations(playing, teamASize);
 
-    // Lógica Gulosa: Manda o jogador para o time que tem MENOS pontos!
-    playing.forEach(playerId => {
-      const pts = rankingsMap[playerId] || 0;
+    // 2. Avalia cada combinação calculando a soma e a diferença
+    interface Candidate {
+      teamA: string[];
+      teamB: string[];
+      sumA: number;
+      sumB: number;
+      diff: number;
+    }
 
-      if (champ.length < maxPerTeam && chall.length < maxPerTeam) {
-        
-        if (champPts < challPts) {
-          champ.push(playerId); champPts += pts;
-        } else if (challPts < champPts) {
-          chall.push(playerId); challPts += pts;
-        } else {
-          // Se os pontos estão empatados, manda pra quem tem menos gente
-          if (champ.length <= chall.length) {
-            champ.push(playerId); champPts += pts;
-          } else {
-            chall.push(playerId); challPts += pts;
-          }
-        }
-
-      } else if (champ.length < maxPerTeam) {
-        champ.push(playerId); champPts += pts;
-      } else {
-        chall.push(playerId); challPts += pts;
-      }
+    const candidates: Candidate[] = allACombos.map(teamA => {
+      const teamB = playing.filter(id => !teamA.includes(id));
+      const sumA = teamA.reduce((acc, id) => acc + getSkill(id), 0);
+      const sumB = teamB.reduce((acc, id) => acc + getSkill(id), 0);
+      return {
+        teamA,
+        teamB,
+        sumA,
+        sumB,
+        diff: Math.abs(sumA - sumB),
+      };
     });
 
-    // 🚨 3. A MOEDA DA SORTE (Acaba com o vício de cor dos times) 🚨
+    // 3. Encontra a menor diferença absoluta possível entre todas as formações
+    const minDiff = Math.min(...candidates.map(c => c.diff));
+
+    // 4. Seleciona o grupo dos melhores encaixes (diferença idêntica ou dentro de 0.5 de tolerância)
+    const bestCandidates = candidates.filter(c => c.diff <= minDiff + 0.5);
+
+    // 5. Escolhe UMA combinação aleatória dentro das melhores opções
+    const chosen = bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
+
+    // 6. Moeda da Sorte (Sorteia quem assume Colete x Sem Colete)
     const coinFlip = Math.random() > 0.5;
-    if (coinFlip) {
-      setChampionIds(chall);
-      setChallengerIds(champ);
-    } else {
-      setChampionIds(champ);
-      setChallengerIds(chall);
-    }
-    
+    const finalChamp = coinFlip ? chosen.teamB : chosen.teamA;
+    const finalChall = coinFlip ? chosen.teamA : chosen.teamB;
+
+    setChampionIds(finalChamp);
+    setChallengerIds(finalChall);
     setPoolIds(bench);
+
+    // 📊 LOGS DE AUDITORIA (Exibidos apenas se DEBUG_SHOW_RATINGS = true)
+    if (DEBUG_SHOW_RATINGS) {
+      console.log("==================================================");
+      console.log("🎲 [SORTEIO BALANCEADO COMBINATÓRIO & VARIÁVEL]");
+      console.log("==================================================");
+      console.log(`💡 Total de formações possíveis avaliadas: ${candidates.length}`);
+      console.log(`🌟 Formações no grupo ótimo (diff <= ${(minDiff + 0.5).toFixed(2)} pts): ${bestCandidates.length}`);
+      console.log("--------------------------------------------------");
+      console.log("📋 Jogadores na partida:");
+      playing.forEach(id => {
+        console.log(`   • ${playersMap[id] || id}: ${getSkill(id).toFixed(2)} pts`);
+      });
+      console.log("--------------------------------------------------");
+      console.log(`🟢 TIME A (${chosen.teamA.length} jog.):`, chosen.teamA.map(id => `${playersMap[id]} (${getSkill(id).toFixed(1)})`).join(', '));
+      console.log(`   👉 Soma: ${chosen.sumA.toFixed(2)} pts | Média: ${(chosen.sumA / chosen.teamA.length).toFixed(2)} pts`);
+      console.log("--------------------------------------------------");
+      console.log(`🔴 TIME B (${chosen.teamB.length} jog.):`, chosen.teamB.map(id => `${playersMap[id]} (${getSkill(id).toFixed(1)})`).join(', '));
+      console.log(`   👉 Soma: ${chosen.sumB.toFixed(2)} pts | Média: ${(chosen.sumB / chosen.teamB.length).toFixed(2)} pts`);
+      console.log("--------------------------------------------------");
+      console.log(`⚖️ Diferença de habilidade: ${chosen.diff.toFixed(2)} pts (Mínima possível: ${minDiff.toFixed(2)} pts)`);
+      console.log(`🪙 Inversão de Cores (Coin Flip): ${coinFlip ? "Sim 🔄" : "Não ➡️"}`);
+      if (bench.length > 0) {
+        console.log(`🛋️ Banco de Areia (${bench.length}):`, bench.map(id => `${playersMap[id]} (${getSkill(id).toFixed(1)})`).join(', '));
+      }
+      console.log("==================================================");
+    }
   };
 
   const executeAbort = async () => {

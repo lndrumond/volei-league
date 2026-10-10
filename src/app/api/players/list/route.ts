@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     // Agora a gente pede pro banco trazer a coluna is_guest também!
     const { data: players } = await supabase
       .from('players')
-      .select('id, name, is_guest')
+      .select('id, name, is_guest, skill_rating')
       .eq('group_id', group.id)
       .eq('is_active', true)
       .order('name');
