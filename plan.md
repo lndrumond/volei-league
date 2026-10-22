@@ -155,8 +155,8 @@ Objetivo: fixar como as telas funcionam antes de implementar. Não é o visual f
 
 ## Fase B: Visual
 
-### B1. Tema e tokens
-**Status: código pronto na branch `fase-a-etapa-a1` (22/10/2026), aguardando confirmação do dono do sistema visual. Nenhuma tela foi alterada ainda (isso é a B3).**
+### B1. Tema e tokens ✅
+**Status: concluída e paleta aprovada pelo dono em 22/10/2026 (ajustes de cor ainda são possíveis depois, vendo na prática). Nenhuma tela foi alterada ainda (isso é a B3). Correção: `next/font/google` quebrava o modo dev do Next 16 ("Module not found ... font/google/font"); as fontes agora ficam no projeto (`src/app/fonts`, `next/font/local`).
 - **Feito:** `src/app/globals.css` com os tokens do mockup aprovado, em tema claro e escuro (`prefers-color-scheme`, com `data-theme` para forçar): fundo `bg`, `surface`, `surface2`, texto `ink`, `muted`, contorno `line`, `soft`; cores `sea` (azul-mar, Sem Colete), `vest` (laranja, Com Colete), `sun` (amarelo-sol, ação principal), `danger`, `ok`; medalhas `gold`, `silver`, `bronze`. Viram classes do Tailwind (`bg-surface`, `text-ink`, `bg-sea`, `rounded-card`, `shadow-pop`...). Fontes por `next/font`: Fredoka (títulos) e Nunito (texto). Raios 22 e 16 px, sombra de botão "fliperama" (`0 4px 0`). Foco visível e respeito a "reduzir movimento".
 - **Efeito imediato nas telas atuais:** só a fonte do texto (Nunito no lugar de Arial) e a cor de fundo do corpo. As telas ainda usam as classes antigas até a B3.
 - **Verificado:** `tsc` sem erros e `next build` completo, com as variáveis de fonte emitidas no CSS final.
@@ -166,6 +166,11 @@ Objetivo: fixar como as telas funcionam antes de implementar. Não é o visual f
 - **Modelo sugerido:** Opus 5.5 (decisão de sistema visual).
 
 ### B2. Componentes
+**Status: código pronto na branch `fase-a-etapa-a1` (22/10/2026), aguardando aprovação do dono. Nenhuma tela foi migrada ainda (isso é a B3).**
+- **Feito** (`src/components/ui`, com `index.ts`): `Button` (sun, sea, vest, danger, plain; md e sm; afunda ao toque; desabilitado), `Card` (+ `Eyebrow` e `Sub`), `Chip` (filtro) + `PlayerChip` (com capitão, visitante e toque para mover) + `CaptainTag`/`GuestTag`, `Modal` (janela que sobe de baixo; Esc fecha; toque fora fecha; foco entra e fica preso; foco volta ao fechar; trava a rolagem) + `ConfirmModal`, `ToastProvider`/`useToast` (substitui o `alert()`: aviso comum e de erro com `role="alert"`, some sozinho, aparece acima da barra), `EmptyState`, e a `BottomNav` refeita com ícones SVG e tokens (ativa em amarelo-sol, respeita a área segura do celular). `ToastProvider` entrou no layout raiz.
+- **Vitrine só de desenvolvimento:** `/estilo` mostra cores, tipografia, botões, chips, medalhas, avisos, janela e estado vazio, com troca de tema (automático, claro, escuro). Em produção responde 404.
+- **Verificado:** `tsc` e lint sem erros; capturas de tela em celular nos temas claro e escuro; janela testada em navegador sem interface (foco entra, 6 Tabs seguidos não saem da janela, Esc fecha); aviso de erro aparece com `role="alert"` acima da barra.
+- **Fora da B2:** `alert()` e `confirm` das telas atuais continuam até a B3.
 - Botão, Card, Chip de jogador, Modal, Toast (substitui `alert()`), Estado vazio, Barra inferior de 4 abas.
 - **Modelo sugerido:** Sonnet 5.5.
 
@@ -210,6 +215,7 @@ Objetivo: fixar como as telas funcionam antes de implementar. Não é o visual f
 ---
 
 ## Histórico de alterações
+- **22/10/2026 (B2, código):** componentes do sistema visual (Button, Card, Chip, PlayerChip, Modal, ConfirmModal, Toast, EmptyState, BottomNav com SVG), vitrine `/estilo` (só dev) e `ToastProvider` no layout. Antes: erro de fonte no modo dev (`next/font/google` no Next 16) corrigido com fontes locais; paleta da B1 aprovada pelo dono. `tsc` e lint sem erros. Commits locais, sem push e sem deploy.
 - **22/10/2026 (B1, código):** tokens de tema (claro e escuro), fontes Fredoka e Nunito e utilidades do Tailwind. Telas não alteradas. `tsc` e `next build` sem erros. Dois commits locais da Fase A feitos antes (`ddff105` código e `634e168` documentos), sem push.
 - **22/10/2026 (A6 concluída):** dono apagou os registros de teste. Conferência por leitura: banco idêntico ao de antes (78/431/38, 0 ativas, ranking com os mesmos totais). Servidor local (`npm run dev`) encerrado a pedido do dono. Commits locais autorizados pelo dono, sem push e sem deploy; deploy só com autorização explícita. A7 (deploy) fica depois da Fase B, por decisão do dono (o visual ainda não foi aplicado).
 - **22/10/2026 (A6, teste de escrita):** com autorização do dono, rodei o roteiro pela API (token de Super Admin) no banco de produção, só com 4 jogadores de teste, 2 partidas e 3 sets. 34 verificações OK. Ranking real do mês idêntico ao de antes. Ids e SQL de limpeza em `plan-a6-limpeza.md`; dono apaga manualmente. Nada apagado por mim. Nenhum commit ou deploy.

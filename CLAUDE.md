@@ -108,6 +108,9 @@ O "Amigos do Vôlei" é um Web App voltado para o gerenciamento de quadras/jogos
 - **Validação de times no servidor:** `setup-teams` hoje grava as listas sem checar. Falta recusar jogador repetido ou em dois times, e passar de 7 por time (etapa A2).
 
 ## Registro de Atualizações
+### [22/10/2026] - Fase B2 (componentes)
+- Componentes em `src/components/ui` (botão, cartão, chips, janela, aviso no lugar do `alert()`, estado vazio) e barra inferior com ícones SVG. Vitrine `/estilo` só em desenvolvimento. Fontes hospedadas em `src/app/fonts`. Telas migradas na B3. Sem deploy.
+
 ### [22/10/2026] - Fase B1 (tema e tokens)
 - Tokens de cor (claro e escuro), fontes Fredoka e Nunito e utilidades do Tailwind em `src/app/globals.css` e `src/app/layout.tsx`. Telas ainda não migradas (B3). Sem deploy.
 

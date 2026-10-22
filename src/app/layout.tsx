@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
+import { ToastProvider } from '@/components/ui/Toast';
 
 // Títulos em Fredoka (arredondada, esportiva) e texto em Nunito (legível em tela pequena).
 // Os arquivos ficam em src/app/fonts (fontes variáveis, subconjunto latino): não dependem do Google em tempo de execução.
@@ -24,9 +25,11 @@ export default function RootLayout({
     <html lang="pt-BR" className={`${fredoka.variable} ${nunito.variable}`}>
       <body className="flex flex-col min-h-screen bg-bg text-ink font-body">
         
-        <main className="flex-1">
-          {children}
-        </main>
+        <ToastProvider>
+          <main className="flex-1">
+            {children}
+          </main>
+        </ToastProvider>
 
         <footer className="w-full bg-gray-900 text-center py-4 z-50 mt-auto">
           <p className="text-gray-400 font-bold text-xs tracking-widest">
