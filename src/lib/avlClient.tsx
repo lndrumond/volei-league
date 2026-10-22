@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Modal from '@/components/ui/Modal';
+import Button from '@/components/ui/Button';
 
 // --- TIPAGENS ---
 export type Role = 'admin' | 'viewer';
@@ -85,7 +87,7 @@ export function useAVLAuth(slug: string) {
   return { token, role, refreshAuth };
 }
 
-// --- MODAL DE PIN (Estilo Yoshi) ---
+// --- JANELA DO PIN ---
 interface PinModalProps {
   slug: string;
   requiredRole: 'admin';
@@ -109,61 +111,43 @@ export function PinModal({ slug, requiredRole, onSuccess, onClose }: PinModalPro
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slug, pin }),
       });
-      
       const data = await res.json();
-      
-      if (data.ok) {
-        if (data.role === requiredRole) {
-          saveAuth(slug, data.token, data.role);
-          onSuccess();
-        } else {
-          setError('Nível insuficiente. Você precisa comer mais maçãs! 🍎');
-        }
+
+      if (data.ok && data.role === requiredRole) {
+        saveAuth(slug, data.token, data.role);
+        onSuccess();
+      } else if (res.status === 401) {
+        setError('PIN incorreto! A bola foi na rede. 🏐');
       } else {
-        setError('PIN incorreto! A bola foi na rede. 🏐❌');
+        setError(data.error || 'Não deu certo. Tenta de novo.');
       }
-    } catch (err) {
-      setError('Erro no servidor! O Yoshi tropeçou. 🥚');
+    } catch {
+      setError('Erro no servidor! Tenta de novo.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-green-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-[2rem] p-8 w-full max-w-sm shadow-2xl border-b-8 border-green-500 animate-in zoom-in duration-200">
-        <div className="flex justify-between items-start mb-2">
-          {/* Ovos e referências ao Yoshi */}
-          <div className="text-5xl drop-shadow-md">🥚</div>
-          <button onClick={onClose} className="text-gray-400 font-black text-2xl p-2 hover:text-gray-600">✕</button>
-        </div>
-        <h2 className="text-3xl font-black text-green-700 mb-1 leading-tight">Acesso<br/>Restrito</h2>
-        <p className="text-gray-500 mb-6 font-bold text-sm">
-          Nível exigido: <span className="uppercase text-orange-500">{requiredRole}</span>
-        </p>
-
-        <form onSubmit={handleValidate} className="flex flex-col gap-4">
-          <input
-            type="number"
-            value={pin}
-            onChange={(e) => setPin(e.target.value)}
-            className="text-center text-4xl font-black p-4 rounded-2xl bg-green-50 border-4 border-green-200 text-green-900 focus:outline-none focus:border-orange-500 transition-colors"
-            placeholder="****"
-            maxLength={6}
-            autoFocus
-          />
-          
-          {error && <div className="text-red-600 font-bold bg-red-100 p-3 rounded-xl text-center text-sm">{error}</div>}
-
-          <button
-            type="submit"
-            disabled={loading || !pin}
-            className="bg-orange-500 text-white text-2xl font-black py-4 rounded-2xl border-b-8 border-orange-700 active:border-b-0 active:translate-y-2 transition-all disabled:opacity-50 mt-2 flex justify-center items-center gap-2"
-          >
-            {loading ? 'Pulando... 🦖' : 'LIBERAR 🔥'}
-          </button>
-        </form>
-      </div>
-    </div>
+    <Modal open onClose={onClose} title="PIN do admin">
+      <form onSubmit={handleValidate} className="flex flex-col gap-3">
+        <p className="text-muted">Digite o PIN para liberar as ações do admin neste aparelho.</p>
+        <label htmlFor="pin" className="sr-only">PIN</label>
+        <input
+          id="pin"
+          type="password"
+          inputMode="numeric"
+          autoComplete="off"
+          value={pin}
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+          maxLength={8}
+          placeholder="••••••"
+          className="text-center text-3xl font-display font-bold tracking-[0.3em] p-3 rounded-[16px] bg-surface2 border-[3px] border-line text-ink"
+        />
+        {error && <p role="alert" className="font-bold text-danger">{error}</p>}
+        <Button type="submit" variant="sun" disabled={loading || !pin}>{loading ? 'Conferindo...' : 'Liberar'}</Button>
+        <Button type="button" size="sm" onClick={onClose}>Voltar</Button>
+      </form>
+    </Modal>
   );
 }

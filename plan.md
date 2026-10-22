@@ -165,8 +165,8 @@ Objetivo: fixar como as telas funcionam antes de implementar. Não é o visual f
 - Confirmar o sistema visual completo com o dono antes de aplicar.
 - **Modelo sugerido:** Opus 5.5 (decisão de sistema visual).
 
-### B2. Componentes
-**Status: código pronto na branch `fase-a-etapa-a1` (22/10/2026), aguardando aprovação do dono. Nenhuma tela foi migrada ainda (isso é a B3).**
+### B2. Componentes ✅
+**Status: concluída em 22/10/2026 (dono mandou seguir para a B3).
 - **Feito** (`src/components/ui`, com `index.ts`): `Button` (sun, sea, vest, danger, plain; md e sm; afunda ao toque; desabilitado), `Card` (+ `Eyebrow` e `Sub`), `Chip` (filtro) + `PlayerChip` (com capitão, visitante e toque para mover) + `CaptainTag`/`GuestTag`, `Modal` (janela que sobe de baixo; Esc fecha; toque fora fecha; foco entra e fica preso; foco volta ao fechar; trava a rolagem) + `ConfirmModal`, `ToastProvider`/`useToast` (substitui o `alert()`: aviso comum e de erro com `role="alert"`, some sozinho, aparece acima da barra), `EmptyState`, e a `BottomNav` refeita com ícones SVG e tokens (ativa em amarelo-sol, respeita a área segura do celular). `ToastProvider` entrou no layout raiz.
 - **Vitrine só de desenvolvimento:** `/estilo` mostra cores, tipografia, botões, chips, medalhas, avisos, janela e estado vazio, com troca de tema (automático, claro, escuro). Em produção responde 404.
 - **Verificado:** `tsc` e lint sem erros; capturas de tela em celular nos temas claro e escuro; janela testada em navegador sem interface (foco entra, 6 Tabs seguidos não saem da janela, Esc fecha); aviso de erro aparece com `role="alert"` acima da barra.
@@ -175,6 +175,14 @@ Objetivo: fixar como as telas funcionam antes de implementar. Não é o visual f
 - **Modelo sugerido:** Sonnet 5.5.
 
 ### B3. Aplicar nas telas
+**Status: código pronto na branch `fase-a-etapa-a1` (22/10/2026), aguardando teste do dono e aprovação. Sem deploy.**
+- **Telas migradas para os componentes e tokens:** Dashboard, Partida, Prancheta (passos 1 e 2, janela de mover jogador e confirmação de abortar), Histórico, Ranking, Votação (urna e sucesso) e Super Admin (login, alvos, PINs e auditoria). `/admin` continua só redirecionando para `/setup`.
+- **Novos:** `AppHeader` (logo, nome e tela), `ui/Team` (`TeamDot`, `Lineup`, `Scoreboard`), janela do PIN refeita com `Modal`. Todos os `alert()` viraram avisos (`useToast`); confirmações usam `ConfirmModal`.
+- **Rodapé global removido** (cobria a barra e forçava rolagem). O crédito "© ano Desenvolvido por Amigos do Vôlei" foi para o fim do Dashboard.
+- **Ajuste de ferramenta:** `next.config.ts` aceita `NEXT_DIST_DIR` (padrão `.next`) para eu rodar um servidor de teste em outra pasta e porta (3100), sem conflitar com o `npm run dev` do dono; `.next-test` está no `.gitignore`.
+- **Verificado:** `tsc` sem erros; lint sem erros novos (3 erros já existentes em `votes/route.ts`, `avlClient.tsx` e o `setState` em efeito do ranking); capturas de tela em celular, claro e escuro, de Dashboard, Partida (visitante), Prancheta passo 1, Histórico, Ranking, Super Admin (login e painel) e Urna.
+- **Não verificado visualmente:** o placar com botões do admin e o passo 2 da prancheta (sorteio, banco, janela de mover), porque só aparecem com uma partida ativa, e isso exige gravar no banco. Usam os mesmos componentes já vistos na vitrine `/estilo`. Ficam para o teste do dono numa rodada de verdade.
+- **Pendente da B3:** nada de código. Falta a revisão do dono.
 - Ordem: Dashboard, Partida, Prancheta, Histórico, Ranking, Votação, Admin.
 - Prancheta é a mais complexa: **Opus 5.5**. Demais: **Sonnet 5.5**. Ajustes repetitivos de classe: **Haiku 5.5**.
 
@@ -215,6 +223,7 @@ Objetivo: fixar como as telas funcionam antes de implementar. Não é o visual f
 ---
 
 ## Histórico de alterações
+- **22/10/2026 (B3, código):** todas as telas migradas para o sistema visual; avisos no lugar dos `alert()`; rodapé global removido; `next.config.ts` com `NEXT_DIST_DIR`. `tsc` sem erros; capturas de tela conferidas. Placar do admin e passo 2 da prancheta só serão vistos em rodada real. Commits locais, sem push e sem deploy.
 - **22/10/2026 (B2, código):** componentes do sistema visual (Button, Card, Chip, PlayerChip, Modal, ConfirmModal, Toast, EmptyState, BottomNav com SVG), vitrine `/estilo` (só dev) e `ToastProvider` no layout. Antes: erro de fonte no modo dev (`next/font/google` no Next 16) corrigido com fontes locais; paleta da B1 aprovada pelo dono. `tsc` e lint sem erros. Commits locais, sem push e sem deploy.
 - **22/10/2026 (B1, código):** tokens de tema (claro e escuro), fontes Fredoka e Nunito e utilidades do Tailwind. Telas não alteradas. `tsc` e `next build` sem erros. Dois commits locais da Fase A feitos antes (`ddff105` código e `634e168` documentos), sem push.
 - **22/10/2026 (A6 concluída):** dono apagou os registros de teste. Conferência por leitura: banco idêntico ao de antes (78/431/38, 0 ativas, ranking com os mesmos totais). Servidor local (`npm run dev`) encerrado a pedido do dono. Commits locais autorizados pelo dono, sem push e sem deploy; deploy só com autorização explícita. A7 (deploy) fica depois da Fase B, por decisão do dono (o visual ainda não foi aplicado).

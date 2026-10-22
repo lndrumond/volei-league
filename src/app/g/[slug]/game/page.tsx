@@ -3,7 +3,9 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetch, getStoredRole } from '@/lib/avlClient';
-import { CHAMPION_NAME, CHALLENGER_NAME, lineupNames, countSets } from '@/lib/teams';
+import { lineupNames, countSets } from '@/lib/teams';
+import { Button, Card, ConfirmModal, EmptyState, Eyebrow, Lineup, Scoreboard, Sub, useToast } from '@/components/ui';
+import AppHeader, { AdminTag } from '@/components/AppHeader';
 
 interface SessionRow {
   id: string;
@@ -18,6 +20,7 @@ interface SessionRow {
 export default function Game() {
   const { slug } = useParams() as { slug: string };
   const router = useRouter();
+  const toast = useToast();
 
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<SessionRow | null>(null);
@@ -66,12 +69,12 @@ export default function Game() {
       const res = await apiFetch(slug, endpoint, { method: 'POST', body: JSON.stringify(body) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(data.error || failMsg);
+        toast.error(data.error || failMsg);
         return false;
       }
       return true;
     } catch {
-      alert(failMsg);
+      toast.error(failMsg);
       return false;
     } finally {
       setBusy(false);
@@ -90,6 +93,7 @@ export default function Game() {
 
   const handleSwap = async () => {
     if (!session) return;
+    setConfirm(null);
     if (await call('/api/sessions/swap', { session_id: session.id }, 'Não deu pra trocar os times.')) {
       router.push(`/g/${slug}/setup`);
     }
@@ -97,52 +101,47 @@ export default function Game() {
 
   const handleEnd = async () => {
     if (!session) return;
+    setConfirm(null);
     if (await call('/api/sessions/end', { session_id: session.id }, 'Erro ao fechar a quadra.')) router.push(`/g/${slug}`);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-green-100 flex items-center justify-center">
-        <h2 className="text-green-800 font-black text-2xl animate-pulse">Limpando os óculos... 🕶️</h2>
-      </div>
-    );
-  }
-
   const shell = (children: React.ReactNode) => (
-    <div className="min-h-screen bg-green-100 p-4 pb-28 max-w-md mx-auto font-sans flex flex-col gap-4">
+    <div className="min-h-screen bg-bg text-ink p-4 pb-28 max-w-md mx-auto flex flex-col gap-3">
+      <AppHeader title="Partida" right={isAdmin ? <AdminTag /> : undefined} />
       {children}
     </div>
   );
 
+  if (loading) {
+    return shell(
+      <div className="text-center py-16">
+        <div className="text-6xl animate-bounce" aria-hidden="true">🏐</div>
+        <p className="font-display font-bold text-xl mt-3">Limpando os óculos...</p>
+      </div>,
+    );
+  }
+
   // Sem partida
   if (!session) {
     return shell(
-      <div className="bg-white rounded-[2rem] p-8 text-center shadow-sm border-b-8 border-green-200 mt-6">
-        <div className="text-6xl mb-2" aria-hidden="true">😴</div>
-        <h1 className="text-2xl font-black text-green-800">Nenhuma partida no momento</h1>
-        <p className="text-gray-500 font-bold mt-2">Quando o admin iniciar, o placar ao vivo aparece aqui.</p>
-        {isAdmin && (
-          <button onClick={() => router.push(`/g/${slug}/setup`)} className="mt-5 w-full bg-green-500 text-white text-xl font-black py-4 rounded-2xl border-b-4 border-green-700 active:border-b-0 active:translate-y-1 transition-all">
-            Iniciar partida
-          </button>
-        )}
-      </div>,
+      <EmptyState
+        icon="😴"
+        title="Nenhuma partida no momento"
+        text="Quando o admin iniciar, o placar ao vivo aparece aqui."
+        action={isAdmin ? <Button variant="sun" onClick={() => router.push(`/g/${slug}/setup`)}>Iniciar partida</Button> : undefined}
+      />,
     );
   }
 
   // Partida sem times
   if (!session.champion_name || !session.challenger_name) {
     return shell(
-      <div className="bg-white rounded-[2rem] p-8 text-center shadow-sm border-b-8 border-green-200 mt-6">
-        <div className="text-6xl mb-2" aria-hidden="true">📋</div>
-        <h1 className="text-2xl font-black text-green-800">Partida sem times</h1>
-        <p className="text-gray-500 font-bold mt-2">Os times ainda não foram definidos.</p>
-        {isAdmin && (
-          <button onClick={() => router.push(`/g/${slug}/setup`)} className="mt-5 w-full bg-orange-500 text-white text-xl font-black py-4 rounded-2xl border-b-4 border-orange-700 active:border-b-0 active:translate-y-1 transition-all">
-            Configurar times
-          </button>
-        )}
-      </div>,
+      <EmptyState
+        icon="📋"
+        title="Partida sem times"
+        text="Os times ainda não foram definidos."
+        action={isAdmin ? <Button variant="sun" onClick={() => router.push(`/g/${slug}/setup`)}>Configurar times</Button> : undefined}
+      />,
     );
   }
 
@@ -153,88 +152,64 @@ export default function Game() {
   return shell(
     <>
       {isAdmin && (
-        <div className="grid grid-cols-2 gap-3">
-          <button onClick={() => setConfirm('swap')} disabled={busy} className="bg-white text-blue-600 font-black py-3 rounded-2xl border-b-4 border-blue-200 active:translate-y-1 active:border-b-0 disabled:opacity-50">
-            🔄 Trocar Times
-          </button>
-          <button onClick={() => setConfirm('end')} disabled={busy} className="bg-white text-red-600 font-black py-3 rounded-2xl border-b-4 border-red-200 active:translate-y-1 active:border-b-0 disabled:opacity-50">
-            🛑 Encerrar
-          </button>
+        <div className="grid grid-cols-2 gap-2.5">
+          <Button size="sm" onClick={() => setConfirm('swap')} disabled={busy}>Trocar Times</Button>
+          <Button size="sm" variant="danger" onClick={() => setConfirm('end')} disabled={busy}>Encerrar</Button>
         </div>
       )}
 
-      <div className="bg-orange-500 rounded-[2rem] p-5 text-white shadow-lg border-b-8 border-orange-700 text-center">
-        <div className="flex items-center justify-center gap-2 mb-1">
-          <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-white" />
+      <Card>
+        <span className="inline-flex items-center gap-1.5 font-extrabold text-xs tracking-[0.06em] text-danger">
+          <span aria-hidden="true" className="w-2.5 h-2.5 rounded-full bg-danger" />
+          AO VIVO
+        </span>
+        {session.description && (
+          <span className="self-start font-extrabold text-[13px] bg-surface2 border-2 border-dashed border-soft rounded-[12px] px-2.5 py-0.5">
+            {session.description}
           </span>
-          <span className="font-black text-sm tracking-widest">AO VIVO</span>
-        </div>
-        {session.description && <div className="text-orange-100 font-bold text-sm">{session.description}</div>}
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mt-2">
-          <span className="font-black text-sm">{CHAMPION_NAME}</span>
-          <span className="font-black text-6xl tabular-nums" aria-label={`${a} a ${b}`}>{a} x {b}</span>
-          <span className="font-black text-sm">{CHALLENGER_NAME}</span>
-        </div>
-      </div>
+        )}
+        <Scoreboard a={a} b={b} big />
+      </Card>
 
       {isAdmin && (
-        <div className="bg-white rounded-[2rem] p-5 shadow-sm border-b-8 border-green-200">
-          <h2 className="font-black text-green-800 text-lg mb-3">Quem ganhou o set?</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => handleWin('champion')} disabled={busy} className="bg-green-500 text-white text-xl font-black py-8 rounded-2xl border-b-8 border-green-700 active:border-b-0 active:translate-y-2 transition-all disabled:opacity-60">
-              {CHAMPION_NAME}
-            </button>
-            <button onClick={() => handleWin('challenger')} disabled={busy} className="bg-orange-500 text-white text-xl font-black py-8 rounded-2xl border-b-8 border-orange-700 active:border-b-0 active:translate-y-2 transition-all disabled:opacity-60">
-              {CHALLENGER_NAME}
-            </button>
+        <Card>
+          <Eyebrow>Quem ganhou o set?</Eyebrow>
+          <div className="grid grid-cols-2 gap-2.5">
+            <Button variant="sea" onClick={() => handleWin('champion')} disabled={busy} className="!py-6">Sem Colete</Button>
+            <Button variant="vest" onClick={() => handleWin('challenger')} disabled={busy} className="!py-6">Com Colete</Button>
           </div>
-          <button onClick={handleUndo} disabled={busy || sets.length === 0} className="mt-3 w-full bg-yellow-300 text-yellow-900 font-black text-lg py-4 rounded-2xl border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1 disabled:opacity-40">
-            ↩ Desfazer último set
-          </button>
-          <p className="text-gray-500 font-bold text-sm mt-3">Só o vencedor do set entra aqui. Os pontos ficam na quadra.</p>
-        </div>
+          <Button variant="sun" onClick={handleUndo} disabled={busy || sets.length === 0}>↩ Desfazer último set</Button>
+          <Sub>Só o vencedor do set entra aqui. Os pontos ficam na quadra.</Sub>
+        </Card>
       )}
 
-      <div className="bg-white rounded-[2rem] p-5 shadow-sm border-b-8 border-green-200">
-        <h2 className="font-black text-green-800 text-lg mb-3">Escalação</h2>
-        <div className="grid grid-cols-2 gap-3">
-          {[{ title: CHAMPION_NAME, list: champ, color: 'text-green-700' }, { title: CHALLENGER_NAME, list: chall, color: 'text-orange-600' }].map((t) => (
-            <div key={t.title}>
-              <h3 className={`font-black ${t.color} mb-1`}>{t.title}</h3>
-              <ul className="font-bold text-gray-700 leading-snug">
-                {t.list.map((p, i) => (
-                  <li key={i}>{p.name}{p.captain && <span className="ml-1 text-[10px] font-black text-orange-500 uppercase">capitão</span>}</li>
-                ))}
-              </ul>
-            </div>
-          ))}
+      <Card>
+        <Eyebrow>Escalação</Eyebrow>
+        <div className="grid grid-cols-2 gap-2.5">
+          <Lineup side="champion" players={champ} />
+          <Lineup side="challenger" players={chall} />
         </div>
-      </div>
+      </Card>
 
-      {confirm && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true">
-          <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm text-center">
-            <div className="text-5xl mb-2" aria-hidden="true">{confirm === 'swap' ? '🔄' : '🚿'}</div>
-            <h2 className="text-2xl font-black text-gray-800 mb-2">{confirm === 'swap' ? 'Trocar os times?' : 'Bora pro banho?'}</h2>
-            <p className="text-gray-500 font-bold mb-5">
-              {confirm === 'swap'
-                ? 'A partida atual termina com os sets já ganhos e você monta os times de novo.'
-                : 'Isso encerra a partida e a rodada, e salva tudo no histórico.'}
-            </p>
-            <div className="flex flex-col gap-3">
-              <button
-                onClick={() => { const c = confirm; setConfirm(null); if (c === 'swap') handleSwap(); else handleEnd(); }}
-                className={`${confirm === 'swap' ? 'bg-blue-500 border-blue-700' : 'bg-red-500 border-red-700'} text-white text-xl font-black py-4 rounded-2xl border-b-8 active:border-b-0 active:translate-y-2 transition-all`}
-              >
-                {confirm === 'swap' ? 'Trocar times' : 'Encerrar'}
-              </button>
-              <button onClick={() => setConfirm(null)} className="bg-gray-100 text-gray-600 text-lg font-black py-3 rounded-2xl">Voltar</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmModal
+        open={confirm === 'swap'}
+        title="Trocar os times?"
+        text="A partida atual termina com os sets já ganhos e você monta os times de novo."
+        confirmLabel="Trocar times"
+        busy={busy}
+        onConfirm={handleSwap}
+        onClose={() => setConfirm(null)}
+      />
+      <ConfirmModal
+        open={confirm === 'end'}
+        danger
+        title="Bora pro banho?"
+        text="Isso encerra a partida e a rodada, e salva tudo no histórico."
+        confirmLabel="Encerrar"
+        busy={busy}
+        onConfirm={handleEnd}
+        onClose={() => setConfirm(null)}
+      />
     </>,
   );
 }

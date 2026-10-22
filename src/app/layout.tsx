@@ -30,13 +30,6 @@ export default function RootLayout({
             {children}
           </main>
         </ToastProvider>
-
-        <footer className="w-full bg-gray-900 text-center py-4 z-50 mt-auto">
-          <p className="text-gray-400 font-bold text-xs tracking-widest">
-            &copy; {new Date().getFullYear()} Desenvolvido por <span className="text-white">Amigos do Vôlei</span>
-          </p>
-        </footer>
-
       </body>
     </html>
   );

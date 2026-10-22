@@ -3,7 +3,9 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import { apiFetch } from '@/lib/avlClient';
-import { CHAMPION_NAME, CHALLENGER_NAME, lineupNames } from '@/lib/teams';
+import { lineupNames } from '@/lib/teams';
+import { Card, Chip, EmptyState, Lineup, Sub } from '@/components/ui';
+import AppHeader from '@/components/AppHeader';
 
 interface Match {
   id: string;
@@ -28,10 +30,12 @@ const FILTERS: { id: Filter; label: string }[] = [
 ];
 
 const TZ = 'America/Sao_Paulo';
-const todayKey = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+const todayKey = new Date().toLocaleDateString('en-CA', { timeZone: TZ });
 const hour = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' });
 const dayLabel = (day: string) =>
   new Date(`${day}T12:00:00-03:00`).toLocaleDateString('pt-BR', { timeZone: TZ, weekday: 'long', day: '2-digit', month: '2-digit' });
+
+const DATE_FIELD = 'mt-1 w-full bg-surface2 text-ink border-[3px] border-line rounded-[14px] px-3 py-2 min-h-12 font-bold';
 
 export default function HistoryPage() {
   const { slug } = useParams() as { slug: string };
@@ -89,111 +93,82 @@ export default function HistoryPage() {
     const champ = lineupNames(m.champion_name, m.champion_player_ids, playersMap);
     const chall = lineupNames(m.challenger_name, m.challenger_player_ids, playersMap);
     return (
-      <div key={m.id} className="bg-white rounded-[1.5rem] p-3 shadow-md border-b-4 border-gray-200">
-        <div className="flex justify-between items-center mb-2 border-b border-dashed border-gray-100 pb-2">
-          <span className="text-xs font-black text-gray-600 uppercase tracking-wider">Partida {n}</span>
-          <span className="text-xs font-bold text-gray-400">
-            {hour(m.created_at)}{m.ended_at ? ` às ${hour(m.ended_at)}` : ''}
-          </span>
+      <Card key={m.id} slim>
+        <div className="flex items-center justify-between">
+          <span className="font-extrabold text-xs tracking-[0.08em] uppercase text-muted">Partida {n}</span>
+          <span className="text-xs font-bold text-muted">{hour(m.created_at)}{m.ended_at ? ` às ${hour(m.ended_at)}` : ''}</span>
         </div>
-        {m.description && <p className="text-center text-sm font-black text-green-800 mb-1 break-words">{m.description}</p>}
-        <div className="text-center font-black text-4xl text-gray-800 tabular-nums mb-2" aria-label={`${a} a ${b}`}>
-          {a} <span className="text-lg text-gray-400">x</span> {b}
+        {m.description && <p className="font-extrabold text-sm break-words">{m.description}</p>}
+        <div className="font-display font-bold text-4xl text-center tabular-nums leading-none" aria-label={`${a} a ${b}`}>
+          {a}<span className="text-xl text-muted"> x </span>{b}
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            { title: CHAMPION_NAME, win: a > b, list: champ, color: 'text-green-700' },
-            { title: CHALLENGER_NAME, win: b > a, list: chall, color: 'text-orange-600' },
-          ].map((t) => (
-            <div key={t.title} className={`rounded-xl border-2 p-2 ${t.win ? 'border-yellow-400 bg-yellow-50' : 'border-gray-100 bg-gray-50'}`}>
-              <h3 className={`font-black text-sm text-center ${t.color}`}>{t.win && '👑 '}{t.title}</h3>
-              <ul className="mt-1 text-sm font-bold text-gray-700 leading-snug">
-                {t.list.map((p, i) => (
-                  <li key={i}>
-                    {p.name}
-                    {p.captain && <span className="ml-1 text-[10px] font-black text-orange-500 uppercase">cap.</span>}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+        <div className="grid grid-cols-2 gap-2.5">
+          <Lineup side="champion" players={champ} win={a > b} />
+          <Lineup side="challenger" players={chall} win={b > a} />
         </div>
-      </div>
+      </Card>
     );
   };
 
   return (
-    <div className="min-h-screen bg-green-100 p-4 pb-28 max-w-md mx-auto relative font-sans">
-      <h1 className="text-2xl font-black text-green-900 text-center mb-3">Baú de Resenhas 📜</h1>
+    <div className="min-h-screen bg-bg text-ink p-4 pb-28 max-w-md mx-auto flex flex-col gap-3">
+      <AppHeader title="Histórico" />
+      <h1 className="text-2xl font-bold">Baú de Resenhas</h1>
 
-      <div className="bg-white p-3 rounded-2xl shadow-sm border-b-4 border-orange-200 mb-4">
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Período">
-          {FILTERS.map((f) => (
-            <button
-              key={f.id}
-              onClick={() => setFilter(f.id)}
-              aria-pressed={filter === f.id}
-              className={`px-3 py-2 min-h-11 rounded-full font-black text-sm border-2 ${
-                filter === f.id ? 'bg-orange-500 text-white border-orange-600' : 'bg-white text-orange-700 border-orange-200'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-        {filter === 'range' && (
-          <div className="flex gap-2 items-center mt-3">
-            <label className="flex-1 text-xs font-black text-orange-800">
-              De
-              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="mt-1 w-full bg-gray-50 rounded-lg p-2 text-sm font-bold border-2 border-orange-200" />
-            </label>
-            <label className="flex-1 text-xs font-black text-orange-800">
-              Até
-              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="mt-1 w-full bg-gray-50 rounded-lg p-2 text-sm font-bold border-2 border-orange-200" />
-            </label>
-          </div>
-        )}
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Período">
+        {FILTERS.map((f) => (
+          <Chip key={f.id} pressed={filter === f.id} onClick={() => setFilter(f.id)}>{f.label}</Chip>
+        ))}
       </div>
 
+      {filter === 'range' && (
+        <div className="grid grid-cols-2 gap-2.5">
+          <label className="font-extrabold text-xs tracking-[0.08em] uppercase text-muted">
+            De
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={DATE_FIELD} />
+          </label>
+          <label className="font-extrabold text-xs tracking-[0.08em] uppercase text-muted">
+            Até
+            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={DATE_FIELD} />
+          </label>
+        </div>
+      )}
+
       {loading ? (
-        <div className="text-center py-10">
-          <div className="text-6xl animate-bounce">🏐</div>
-          <p className="text-green-800 font-black mt-2">Rebobinando a fita...</p>
+        <div className="text-center py-12">
+          <div className="text-6xl animate-bounce" aria-hidden="true">🏐</div>
+          <p className="font-display font-bold text-xl mt-3">Rebobinando a fita...</p>
         </div>
       ) : error ? (
-        <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 text-center text-red-700 font-bold">{error}</div>
+        <p role="alert" className="bg-danger text-danger-ink border-[3px] border-line rounded-[16px] px-4 py-3 font-bold text-center">{error}</p>
       ) : rounds.length === 0 ? (
-        <div className="bg-white rounded-3xl p-6 text-center border-b-4 border-gray-200 shadow-sm">
-          <span className="text-5xl mb-3 block">🏜️</span>
-          <h2 className="font-black text-gray-700 text-lg">Areia esfriou</h2>
-          <p className="text-gray-500 font-bold mt-1 text-sm">
-            {filter === 'range' && (!startDate || !endDate) ? 'Escolha a data inicial e a final.' : 'Nenhuma rodada neste período.'}
-          </p>
-        </div>
+        <EmptyState
+          icon="🫗"
+          title="Areia esfriou"
+          text={filter === 'range' && (!startDate || !endDate) ? 'Escolha a data inicial e a final.' : 'Nenhuma rodada neste período.'}
+        />
       ) : (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
           {rounds.map((r) => {
             const n = r.matches.length;
-            const isToday = r.day === todayKey;
-            // Igual ao mockup: toda rodada é uma sanfona; abre sozinha se tiver até 2 partidas.
+            // Toda rodada é uma sanfona; abre sozinha se tiver até 2 partidas.
             return (
               <details key={r.day} open={n <= 2} className="group">
-                <summary className="flex items-center justify-between gap-3 bg-white rounded-2xl p-4 shadow-sm border-b-4 border-green-300 cursor-pointer list-none [&::-webkit-details-marker]:hidden min-h-14">
-                  <h2 className="font-black text-green-900 capitalize">{isToday ? 'Hoje · ' : ''}{dayLabel(r.day)}</h2>
-                  <span className="flex items-center gap-3 shrink-0">
-                    <span className="text-sm font-bold text-gray-500">{n} {n === 1 ? 'partida' : 'partidas'}</span>
-                    <span aria-hidden="true" className="text-green-700 transition-transform group-open:rotate-180">▼</span>
+                <summary className="flex items-center justify-between gap-3 bg-surface text-ink border-[3px] border-line rounded-card shadow-pop px-4 py-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden min-h-14">
+                  <h2 className="text-lg font-bold capitalize">{r.day === todayKey ? 'Hoje · ' : ''}{dayLabel(r.day)}</h2>
+                  <span className="flex items-center gap-2.5 shrink-0">
+                    <span className="font-extrabold text-sm text-muted">{n} {n === 1 ? 'partida' : 'partidas'}</span>
+                    <span aria-hidden="true" className="text-muted transition-transform group-open:rotate-180">▼</span>
                   </span>
                 </summary>
-                <div className="flex flex-col gap-3 mt-3">
-                  {r.matches.map((m, i) => matchCard(m, i + 1))}
-                </div>
+                <div className="flex flex-col gap-3 mt-3">{r.matches.map((m, i) => matchCard(m, i + 1))}</div>
               </details>
             );
           })}
         </div>
       )}
-      {!loading && !error && <p className="text-center text-sm font-bold text-gray-500 mt-4">Rodadas abortadas, sem times, não aparecem aqui.</p>}
+
+      {!loading && !error && <Sub className="text-center">Rodadas abortadas, sem times, não aparecem aqui.</Sub>}
     </div>
   );
 }

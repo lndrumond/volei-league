@@ -5,11 +5,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { apiFetch, getStoredRole } from '@/lib/avlClient';
 import { CHAMPION_NAME, CHALLENGER_NAME, teamNameWithCaptain } from '@/lib/teams';
 import { drawTeams } from '@/lib/draw';
+import { Button, Card, ConfirmModal, EmptyState, Eyebrow, Modal, PlayerChip, Sub, TeamDot, useToast } from '@/components/ui';
+import AppHeader from '@/components/AppHeader';
 
 interface PlayerRow { id: string; name: string; is_guest: boolean; is_active?: boolean; skill_rating?: number; }
 type Side = 'c' | 'h' | 'b'; // c = Sem Colete, h = Com Colete, b = banco de areia
 
 const MAX_PER_TEAM = 7;
+const FIELD = 'w-full bg-surface2 text-ink border-[3px] border-line rounded-[14px] px-3 py-2.5 min-h-12 font-bold placeholder:text-muted placeholder:font-semibold';
 
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
@@ -19,6 +22,7 @@ const shortDate = () =>
 export default function Setup() {
   const { slug } = useParams() as { slug: string };
   const router = useRouter();
+  const toast = useToast();
 
   const [ready, setReady] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -36,7 +40,6 @@ export default function Setup() {
   const [sheetFor, setSheetFor] = useState<string | null>(null);
 
   const [busy, setBusy] = useState(false);
-  const [toast, setToast] = useState('');
   const [showAbort, setShowAbort] = useState(false);
 
   const nameOf = useMemo(() => {
@@ -44,8 +47,6 @@ export default function Setup() {
     players.forEach((p) => { m[p.id] = p.name; });
     return m;
   }, [players]);
-
-  const flash = (t: string) => { setToast(t); setTimeout(() => setToast(''), 2200); };
 
   useEffect(() => {
     const admin = getStoredRole(slug) === 'admin';
@@ -67,7 +68,7 @@ export default function Setup() {
         const s = sessData.activeSession;
         if (s) {
           if ((sessData.sets || []).length > 0) {
-            alert('Essa partida já tem set anotado. Para mudar os times, use Trocar Times no placar.');
+            toast.error('Essa partida já tem set anotado. Para mudar os times, use Trocar Times no placar.');
             router.replace(`/g/${slug}/game`);
             return;
           }
@@ -78,12 +79,13 @@ export default function Setup() {
         }
       } catch (e) {
         console.error(e);
-        alert('Falha de conexão com a areia! Tente novamente.');
+        toast.error('Falha de conexão com a areia! Tente novamente.');
         router.replace(`/g/${slug}`);
         return;
       }
       setReady(true);
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, router]);
 
   const skillOf = (id: string) => {
@@ -119,9 +121,9 @@ export default function Setup() {
       });
       if (!res.ok) throw new Error();
       setPlayers((prev) => prev.map((x) => (x.id === p.id ? { ...x, is_guest: makeGuest } : x)));
-      flash(`${p.name} agora é ${makeGuest ? 'visitante' : 'fixo'}`);
+      toast.show(`${p.name} agora é ${makeGuest ? 'visitante' : 'fixo'}`);
     } catch {
-      alert('Erro ao mudar o status.');
+      toast.error('Erro ao mudar o status.');
     }
   };
 
@@ -139,9 +141,9 @@ export default function Setup() {
       setPlayers((prev) => [...prev, data.player]);
       setPresent((prev) => [...prev, data.player.id]);
       setQ('');
-      flash(`${data.player.name} cadastrado como visitante`);
+      toast.show(`${data.player.name} cadastrado como visitante`);
     } catch {
-      alert('Erro ao adicionar o visitante.');
+      toast.error('Erro ao adicionar o visitante.');
     } finally {
       setBusy(false);
     }
@@ -181,14 +183,14 @@ export default function Setup() {
       }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(data.error || 'Erro ao salvar os presentes.');
+        toast.error(data.error || 'Erro ao salvar os presentes.');
         return;
       }
       if (data.session?.id) setSessionId(data.session.id);
       runDraw(present);
       setStep(2);
     } catch {
-      alert('Erro ao salvar os presentes.');
+      toast.error('Erro ao salvar os presentes.');
     } finally {
       setBusy(false);
     }
@@ -200,7 +202,7 @@ export default function Setup() {
   const challIds = inSide('h');
   const benchIds = inSide('b');
 
-  // O capitão é sempre alguém do time; se saiu, sorteia outro.
+  // O capitão é sempre alguém do time; se saiu, vale o primeiro da lista.
   const capOf = (k: 'c' | 'h', list: string[]) => {
     const cur = caps[k];
     return cur && list.includes(cur) ? cur : list.length ? list[0] : null;
@@ -213,7 +215,7 @@ export default function Setup() {
 
   const moveTo = (id: string, to: Side) => {
     if ((to === 'c' && champIds.length >= MAX_PER_TEAM) || (to === 'h' && challIds.length >= MAX_PER_TEAM)) {
-      flash('Time cheio: no máximo 7 jogadores');
+      toast.show('Time cheio: no máximo 7 jogadores');
       return;
     }
     setAssign((prev) => ({ ...prev, [id]: to }));
@@ -238,12 +240,12 @@ export default function Setup() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(data.error || 'Deu ruim ao salvar os times!');
+        toast.error(data.error || 'Deu ruim ao salvar os times!');
         return;
       }
       router.push(`/g/${slug}/game`);
     } catch {
-      alert('Deu ruim ao salvar os times!');
+      toast.error('Deu ruim ao salvar os times!');
     } finally {
       setBusy(false);
     }
@@ -256,231 +258,203 @@ export default function Setup() {
         const res = await apiFetch(slug, '/api/sessions/end', { method: 'POST', body: JSON.stringify({ session_id: sessionId }) });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          alert(data.error || 'Erro ao fechar a quadra.');
+          toast.error(data.error || 'Erro ao fechar a quadra.');
           setBusy(false);
           return;
         }
       }
       router.push(`/g/${slug}`);
     } catch {
-      alert('Erro ao fechar a quadra.');
+      toast.error('Erro ao fechar a quadra.');
       setBusy(false);
     }
   };
 
   // ---------- telas ----------
+  const shell = (children: React.ReactNode) => (
+    <div className="min-h-screen bg-bg text-ink p-4 pb-10 max-w-md mx-auto flex flex-col gap-3">
+      <AppHeader
+        title="Prancheta"
+        right={<Button size="sm" inline onClick={() => router.push(`/g/${slug}`)} className="!min-h-9 !px-3 !py-1 !text-sm text-ink">Sair</Button>}
+      />
+      {children}
+    </div>
+  );
+
   if (!ready) {
-    return (
-      <div className="min-h-screen bg-orange-50 flex flex-col items-center justify-center p-4 text-center">
-        <h2 className="text-orange-800 font-black text-3xl animate-pulse mb-6">Pintando as linhas da quadra...</h2>
-        <span className="text-6xl animate-bounce">🏐</span>
-      </div>
+    return shell(
+      <div className="text-center py-16">
+        <div className="text-6xl animate-bounce" aria-hidden="true">🏐</div>
+        <p className="font-display font-bold text-xl mt-3">Pintando as linhas da quadra...</p>
+      </div>,
     );
   }
 
   if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-orange-50 p-4 flex items-center justify-center">
-        <div className="bg-white rounded-[2rem] p-8 text-center shadow-sm border-b-8 border-orange-200 max-w-sm">
-          <div className="text-6xl mb-2" aria-hidden="true">🔒</div>
-          <h1 className="text-2xl font-black text-orange-900">Só para o admin</h1>
-          <p className="text-gray-500 font-bold mt-2">A prancheta de times é do admin. Você acompanha o jogo pelas outras abas.</p>
-          <button onClick={() => router.push(`/g/${slug}`)} className="mt-5 w-full bg-orange-500 text-white text-lg font-black py-3 rounded-2xl border-b-4 border-orange-700">Voltar</button>
-        </div>
-      </div>
+    return shell(
+      <EmptyState
+        icon="🔒"
+        title="Só para o admin"
+        text="A prancheta de times é do admin. Você acompanha o jogo pelas outras abas."
+        action={<Button variant="sun" onClick={() => router.push(`/g/${slug}`)}>Voltar ao Dashboard</Button>}
+      />,
     );
   }
 
-  const row = (id: string, cap: boolean, label?: string) => (
+  const teamRow = (id: string, cap: boolean) => (
     <li key={id}>
-      <button
-        onClick={() => setSheetFor(id)}
-        aria-label={`${nameOf[id]}: trocar de time ou mandar para o banco`}
-        className="w-full flex items-center justify-between gap-2 py-3 px-2 min-h-12 font-bold text-gray-800 text-left border-b border-gray-100"
-      >
-        <span>{nameOf[id]}{cap && <span className="ml-1 text-[10px] font-black text-orange-500 uppercase">cap.</span>}{label}</span>
-        <span aria-hidden="true" className="text-gray-400">⇄</span>
-      </button>
+      <PlayerChip name={nameOf[id] || 'Jogador'} captain={cap} onClick={() => setSheetFor(id)} ariaLabel={`${nameOf[id]}: trocar de time ou mandar para o banco`} />
     </li>
   );
 
   const sheetSide = sheetFor ? assign[sheetFor] : null;
   const whereText = sheetSide === 'c' ? 'no Sem Colete' : sheetSide === 'h' ? 'no Com Colete' : 'no banco de areia';
+  const champFull = champIds.length >= MAX_PER_TEAM;
+  const challFull = challIds.length >= MAX_PER_TEAM;
 
-  return (
-    <div className="min-h-screen bg-orange-50 p-4 pb-24 max-w-md mx-auto font-sans relative flex flex-col gap-4">
-      <div className="flex justify-between items-center">
-        <button onClick={() => router.push(`/g/${slug}`)} className="text-orange-800 font-black flex items-center gap-2 py-2">
-          <span>◀</span> Sair
-        </button>
-        <button onClick={() => setShowAbort(true)} className="text-red-500 bg-red-100 px-3 py-2 rounded-xl font-black text-sm border-b-4 border-red-200 active:translate-y-1 transition-all">
-          🛑 Abortar
-        </button>
-      </div>
-
-      <h1 className="text-3xl font-black text-orange-900 text-center leading-tight">
-        Tirando os <span className="text-orange-500">Times</span> 🤼
-      </h1>
-
+  return shell(
+    <>
       {isSwap && step === 1 && (
-        <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-3 text-blue-900 font-bold text-sm">
-          <b>Trocar Times.</b> A partida anterior já foi encerrada com os sets ganhos. Ajuste os presentes e monte os times de novo.
-        </div>
+        <p className="bg-surface border-2 border-soft rounded-[16px] px-3.5 py-3 text-muted text-sm">
+          <b className="text-ink">Trocar Times.</b> A partida anterior já foi encerrada com os sets ganhos. Ajuste os presentes e monte os times de novo.
+        </p>
       )}
 
       {step === 1 && (
         <>
-          <div className="bg-white p-5 rounded-[2rem] shadow-sm border-b-8 border-orange-200">
-            <label htmlFor="desc" className="font-black text-orange-800 text-sm">Nome da rodada (opcional)</label>
-            <input
-              id="desc" type="text" value={desc} onChange={(e) => setDesc(e.target.value)} maxLength={80}
-              placeholder={autoName} autoComplete="off"
-              className="mt-2 w-full bg-gray-50 border-4 border-gray-100 rounded-2xl p-3 font-bold text-gray-700 outline-none focus:border-orange-500"
-            />
-            <p className="text-gray-500 font-bold text-xs mt-2">Em branco, usamos “{autoName}”.</p>
-          </div>
+          <Card slim>
+            <label htmlFor="desc"><Eyebrow>Nome da rodada (opcional)</Eyebrow></label>
+            <input id="desc" type="text" value={desc} onChange={(e) => setDesc(e.target.value)} maxLength={80} placeholder={autoName} autoComplete="off" className={FIELD} />
+            <Sub>Em branco, usamos “{autoName}”.</Sub>
+          </Card>
 
-          <div className="bg-white p-5 rounded-[2rem] shadow-sm border-b-8 border-orange-200">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-black text-orange-800 text-lg">Quem está na areia?</h2>
-              <span className="bg-orange-100 text-orange-700 font-black text-sm px-3 py-1 rounded-full">
+          <Card slim>
+            <div className="flex items-center gap-2">
+              <h2 className="flex-1 text-lg font-bold">Quem está na areia?</h2>
+              <span className="font-extrabold text-[13px] bg-sun text-sun-ink border-2 border-line rounded-full px-3 py-0.5">
                 {present.length} {present.length === 1 ? 'presente' : 'presentes'}
               </span>
             </div>
-            <input
-              type="search" value={q} onChange={(e) => setQ(e.target.value)} autoComplete="off"
-              placeholder="Buscar jogador pelo nome" aria-label="Buscar jogador pelo nome"
-              className="w-full bg-gray-50 border-4 border-gray-100 rounded-2xl p-3 font-bold text-gray-700 outline-none focus:border-orange-500 mb-2"
-            />
-
-            {!nq && fixos.length > 0 && (
-              <button onClick={toggleAllFixos} aria-pressed={allFixos} className="w-full flex items-center gap-3 py-3 px-2 min-h-12 font-black text-gray-800 border-b border-gray-100 text-left">
-                <span className={`w-7 h-7 rounded-lg border-4 flex items-center justify-center text-sm ${allFixos ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300'}`} aria-hidden="true">
-                  {allFixos ? '✓' : fixosOn ? '–' : ''}
-                </span>
-                Selecionar todos os fixos
-              </button>
-            )}
+            <input type="search" value={q} onChange={(e) => setQ(e.target.value)} autoComplete="off" placeholder="Buscar jogador pelo nome" aria-label="Buscar jogador pelo nome" className={FIELD} />
 
             <ul>
+              {!nq && fixos.length > 0 && (
+                <li className="flex items-center border-b border-soft">
+                  <button type="button" onClick={toggleAllFixos} aria-pressed={allFixos} className="flex-1 flex items-center gap-2.5 min-h-12 py-1 text-left font-extrabold">
+                    <span aria-hidden="true" className={`w-7 h-7 shrink-0 grid place-items-center rounded-[9px] border-[3px] border-line font-extrabold ${allFixos || fixosOn ? 'bg-sea text-sea-ink' : 'bg-surface'}`}>
+                      {allFixos ? '✓' : fixosOn ? '–' : ''}
+                    </span>
+                    Selecionar todos os fixos
+                  </button>
+                </li>
+              )}
               {visible.map((p) => {
                 const on = present.includes(p.id);
                 return (
-                  <li key={p.id} className="flex items-center gap-2 border-b border-gray-100">
-                    <button onClick={() => togglePresent(p.id)} aria-pressed={on} className="flex-1 flex items-center gap-3 py-3 px-2 min-h-12 font-bold text-gray-800 text-left">
-                      <span className={`w-7 h-7 rounded-lg border-4 flex items-center justify-center text-sm shrink-0 ${on ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300'}`} aria-hidden="true">{on ? '✓' : ''}</span>
-                      {p.name}
+                  <li key={p.id} className="flex items-center gap-2 border-b border-soft">
+                    <button type="button" onClick={() => togglePresent(p.id)} aria-pressed={on} className="flex-1 min-w-0 flex items-center gap-2.5 min-h-12 py-1 text-left font-extrabold">
+                      <span aria-hidden="true" className={`w-7 h-7 shrink-0 grid place-items-center rounded-[9px] border-[3px] border-line font-extrabold ${on ? 'bg-sea text-sea-ink' : 'bg-surface'}`}>{on ? '✓' : ''}</span>
+                      <span className="truncate">{p.name}</span>
                     </button>
-                    <div role="group" aria-label={`Cadastro de ${p.name}`} className="flex rounded-xl overflow-hidden border-2 border-gray-200 text-xs font-black shrink-0">
-                      <button onClick={() => setGuest(p, false)} aria-pressed={!p.is_guest} className={`px-2 py-2 ${!p.is_guest ? 'bg-green-500 text-white' : 'bg-white text-gray-500'}`}>Fixo</button>
-                      <button onClick={() => setGuest(p, true)} aria-pressed={p.is_guest} className={`px-2 py-2 ${p.is_guest ? 'bg-orange-500 text-white' : 'bg-white text-gray-500'}`}>Visitante</button>
+                    <div role="group" aria-label={`Cadastro de ${p.name}`} className="flex shrink-0 rounded-[12px] overflow-hidden border-2 border-line text-xs font-extrabold">
+                      <button type="button" onClick={() => setGuest(p, false)} aria-pressed={!p.is_guest} className={`min-h-10 px-2.5 ${!p.is_guest ? 'bg-sun text-sun-ink' : 'bg-surface text-muted'}`}>Fixo</button>
+                      <button type="button" onClick={() => setGuest(p, true)} aria-pressed={p.is_guest} className={`min-h-10 px-2.5 border-l-2 border-line ${p.is_guest ? 'bg-sun text-sun-ink' : 'bg-surface text-muted'}`}>Visitante</button>
                     </div>
                   </li>
                 );
               })}
             </ul>
 
-            {visible.length === 0 && nq && <p className="text-gray-500 font-bold text-sm mt-2">Ninguém com esse nome no cadastro.</p>}
+            {visible.length === 0 && nq && <Sub>Ninguém com esse nome no cadastro.</Sub>}
             {nq && !sorted.some((p) => norm(p.name) === nq) && (
-              <button onClick={addGuest} disabled={busy} className="mt-3 w-full bg-yellow-300 text-yellow-900 font-black py-3 rounded-2xl border-b-4 border-yellow-500 active:translate-y-1 active:border-b-0 disabled:opacity-50">
-                + Adicionar “{q.trim()}” como visitante
-              </button>
+              <Button size="sm" variant="sun" onClick={addGuest} disabled={busy}>+ Adicionar “{q.trim()}” como visitante</Button>
             )}
-            {!nq && <p className="text-gray-500 font-bold text-xs mt-3">Visitante? Digite o nome na busca.</p>}
-          </div>
+            {!nq && <Sub>Visitante? Digite o nome na busca.</Sub>}
+          </Card>
 
-          <button onClick={goToTeams} disabled={present.length < 2 || busy} className="w-full bg-yellow-400 text-yellow-900 text-2xl font-black py-5 rounded-2xl border-b-8 border-yellow-600 active:border-b-0 active:translate-y-2 transition-all disabled:opacity-50">
-            {busy ? 'Salvando...' : 'Montar times'}
-          </button>
+          <Button variant="sun" onClick={goToTeams} disabled={present.length < 2 || busy}>{busy ? 'Salvando...' : 'Montar times'}</Button>
         </>
       )}
 
       {step === 2 && (
         <>
-          <div className="bg-white p-5 rounded-[2rem] shadow-sm border-b-8 border-orange-200">
-            <h2 className="font-black text-orange-800 text-lg">Banco de areia ({benchIds.length})</h2>
-            <p className="text-gray-500 font-bold text-sm">Quem fica de fora desta partida.</p>
-            {benchIds.length ? <ul className="mt-2">{benchIds.map((id) => row(id, false))}</ul> : <p className="font-black text-gray-700 mt-2">Ninguém de fora.</p>}
-          </div>
+          <Card slim>
+            <h2 className="text-lg font-bold">Banco de areia ({benchIds.length})</h2>
+            <Sub>Quem fica de fora desta partida.</Sub>
+            {benchIds.length ? (
+              <ul className="grid grid-cols-2 gap-2">{benchIds.map((id) => teamRow(id, false))}</ul>
+            ) : (
+              <p className="font-extrabold">Ninguém de fora.</p>
+            )}
+          </Card>
 
-          <div className="bg-white p-5 rounded-[2rem] shadow-sm border-b-8 border-orange-200">
-            <h2 className="font-black text-orange-800 text-lg">Times sorteados</h2>
-            <p className="text-gray-500 font-bold text-sm">Toque no nome de um jogador para trocar de time ou mandar para o banco.</p>
-            <div className="grid grid-cols-2 gap-3 mt-3">
-              <div>
-                <h3 className="font-black text-green-700">{CHAMPION_NAME}</h3>
-                <ul>{orderedWithCaptain(champIds, champCap).map((id) => row(id, id === champCap))}</ul>
+          <Card slim>
+            <h2 className="text-lg font-bold">Times sorteados</h2>
+            <Sub>Toque no nome de um jogador para trocar de time ou mandar para o banco.</Sub>
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="min-w-0">
+                <h3 className="font-display font-bold text-[15px] mb-1.5"><TeamDot side="champion" />{CHAMPION_NAME}</h3>
+                <ul className="flex flex-col gap-1.5">{orderedWithCaptain(champIds, champCap).map((id) => teamRow(id, id === champCap))}</ul>
               </div>
-              <div>
-                <h3 className="font-black text-orange-600">{CHALLENGER_NAME}</h3>
-                <ul>{orderedWithCaptain(challIds, challCap).map((id) => row(id, id === challCap))}</ul>
+              <div className="min-w-0">
+                <h3 className="font-display font-bold text-[15px] mb-1.5"><TeamDot side="challenger" />{CHALLENGER_NAME}</h3>
+                <ul className="flex flex-col gap-1.5">{orderedWithCaptain(challIds, challCap).map((id) => teamRow(id, id === challCap))}</ul>
               </div>
             </div>
-            <div className="flex gap-4 mt-3 font-black text-sm text-gray-700">
-              <span>{CHAMPION_NAME} {champIds.length}</span>
-              <span>{CHALLENGER_NAME} {challIds.length}</span>
+            <div className="flex gap-4 font-extrabold text-sm">
+              <span><TeamDot side="champion" />{CHAMPION_NAME} {champIds.length}</span>
+              <span><TeamDot side="challenger" />{CHALLENGER_NAME} {challIds.length}</span>
             </div>
-            <p className="text-gray-500 font-bold text-xs mt-2">O sorteio coloca até 6 por time. À mão cabem até 7.</p>
-            <button onClick={() => runDraw(present)} className="mt-3 w-full bg-gray-100 text-gray-700 font-black py-3 rounded-2xl border-b-4 border-gray-300 active:translate-y-1 active:border-b-0">
-              Sortear de novo
-            </button>
-          </div>
+            <Sub>O sorteio coloca até 6 por time. À mão cabem até 7.</Sub>
+            <Button size="sm" onClick={() => runDraw(present)}>Sortear de novo</Button>
+          </Card>
 
-          <button onClick={startMatch} disabled={busy || champIds.length === 0 || challIds.length === 0} className="w-full bg-yellow-400 text-yellow-900 text-2xl font-black py-5 rounded-2xl border-b-8 border-yellow-600 active:border-b-0 active:translate-y-2 transition-all disabled:opacity-50">
-            {busy ? 'Salvando...' : 'BOLA PRO ALTO!'}
-          </button>
-          <button onClick={() => setStep(1)} className="w-full text-orange-800 font-black py-2">Voltar aos presentes</button>
+          <Button variant="sun" onClick={startMatch} disabled={busy || champIds.length === 0 || challIds.length === 0}>{busy ? 'Salvando...' : 'BOLA PRO ALTO!'}</Button>
+          <Button size="sm" onClick={() => setStep(1)}>Voltar aos presentes</Button>
         </>
       )}
 
-      <p className="text-gray-500 font-bold text-xs text-center">Abortar encerra a rodada toda, sem gravar nada.</p>
+      <Button size="sm" variant="danger" onClick={() => setShowAbort(true)}>Abortar</Button>
+      <Sub className="text-center">Abortar encerra a rodada toda, sem gravar nada.</Sub>
 
       {/* Janela para mover jogador */}
-      {sheetFor && sheetSide && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center" onClick={() => setSheetFor(null)}>
-          <div role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} className="bg-white rounded-t-[2rem] p-6 w-full max-w-md flex flex-col gap-3">
-            <h3 className="text-2xl font-black text-gray-800">{nameOf[sheetFor]}</h3>
-            <p className="text-gray-500 font-bold">Está {whereText}. O que você quer fazer?</p>
+      <Modal open={Boolean(sheetFor && sheetSide)} onClose={() => setSheetFor(null)} title={sheetFor ? nameOf[sheetFor] || '' : ''}>
+        {sheetFor && sheetSide && (
+          <>
+            <p className="text-muted">Está {whereText}. O que você quer fazer?</p>
             {sheetSide !== 'c' && (
-              <button onClick={() => moveTo(sheetFor, 'c')} disabled={champIds.length >= MAX_PER_TEAM} className="bg-green-500 text-white text-lg font-black py-4 rounded-2xl border-b-4 border-green-700 disabled:opacity-40">
-                {sheetSide === 'b' ? 'Colocar no' : 'Passar para o'} {CHAMPION_NAME}
-              </button>
+              <>
+                <Button variant="sea" onClick={() => moveTo(sheetFor, 'c')} disabled={champFull}>{sheetSide === 'b' ? 'Colocar no' : 'Passar para o'} {CHAMPION_NAME}</Button>
+                {champFull && <Sub className="text-center -mt-1">{CHAMPION_NAME} está cheio (7 jogadores).</Sub>}
+              </>
             )}
             {sheetSide !== 'h' && (
-              <button onClick={() => moveTo(sheetFor, 'h')} disabled={challIds.length >= MAX_PER_TEAM} className="bg-orange-500 text-white text-lg font-black py-4 rounded-2xl border-b-4 border-orange-700 disabled:opacity-40">
-                {sheetSide === 'b' ? 'Colocar no' : 'Passar para o'} {CHALLENGER_NAME}
-              </button>
+              <>
+                <Button variant="vest" onClick={() => moveTo(sheetFor, 'h')} disabled={challFull}>{sheetSide === 'b' ? 'Colocar no' : 'Passar para o'} {CHALLENGER_NAME}</Button>
+                {challFull && <Sub className="text-center -mt-1">{CHALLENGER_NAME} está cheio (7 jogadores).</Sub>}
+              </>
             )}
             {sheetSide !== 'b' && (
-              <button onClick={() => moveTo(sheetFor, 'b')} className="bg-gray-100 text-gray-700 text-lg font-black py-4 rounded-2xl border-b-4 border-gray-300">
-                Mandar para o banco de areia
-              </button>
+              <>
+                <Button onClick={() => moveTo(sheetFor, 'b')}>Mandar para o banco de areia</Button>
+                <Sub className="text-center -mt-1">O banco de areia é quem fica de fora desta partida.</Sub>
+              </>
             )}
-            {(champIds.length >= MAX_PER_TEAM || challIds.length >= MAX_PER_TEAM) && (
-              <p className="text-gray-500 font-bold text-xs">Um time cheio (7 jogadores) não aceita mais ninguém.</p>
-            )}
-            <button onClick={() => setSheetFor(null)} className="text-gray-500 font-black py-2">Voltar</button>
-          </div>
-        </div>
-      )}
+            <Button size="sm" onClick={() => setSheetFor(null)}>Voltar</Button>
+          </>
+        )}
+      </Modal>
 
-      {showAbort && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true">
-          <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm text-center">
-            <div className="text-5xl mb-2" aria-hidden="true">🛑</div>
-            <h2 className="text-2xl font-black text-gray-800 mb-2">Abortar a rodada?</h2>
-            <p className="text-gray-500 font-bold mb-5">Isso encerra a rodada toda, sem gravar nada.</p>
-            <div className="flex flex-col gap-3">
-              <button onClick={abort} disabled={busy} className="bg-red-500 text-white text-xl font-black py-4 rounded-2xl border-b-8 border-red-700 active:border-b-0 active:translate-y-2 transition-all disabled:opacity-50">Abortar</button>
-              <button onClick={() => setShowAbort(false)} className="bg-gray-100 text-gray-600 text-lg font-black py-3 rounded-2xl">Voltar</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {toast && (
-        <div role="status" className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white font-bold px-4 py-2 rounded-full z-50 text-sm">{toast}</div>
-      )}
-    </div>
+      <ConfirmModal
+        open={showAbort}
+        danger
+        title="Abortar a rodada?"
+        text="Isso encerra a rodada toda, sem gravar nada."
+        confirmLabel="Abortar"
+        busy={busy}
+        onConfirm={abort}
+        onClose={() => setShowAbort(false)}
+      />
+    </>,
   );
 }

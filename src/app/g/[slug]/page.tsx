@@ -3,8 +3,10 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import { apiFetch, PinModal, useAVLAuth, clearAuth } from '@/lib/avlClient';
-import { CHAMPION_NAME, CHALLENGER_NAME, lineupNames, countSets } from '@/lib/teams';
+import { lineupNames, countSets } from '@/lib/teams';
 import { MEDALS, top5 } from '@/lib/ranking';
+import { Button, Card, Chip, Eyebrow, Lineup, Scoreboard, Sub, useToast } from '@/components/ui';
+import AppHeader, { AdminTag } from '@/components/AppHeader';
 
 interface RankingItem { name: string; points: number; is_guest?: boolean; }
 interface SessionRow {
@@ -17,9 +19,12 @@ interface SessionRow {
   ended_at?: string | null;
 }
 
+const MEDAL_BG = ['bg-gold', 'bg-silver', 'bg-bronze'];
+
 export default function Dashboard() {
   const { slug } = useParams() as { slug: string };
   const router = useRouter();
+  const toast = useToast();
   const { role, refreshAuth } = useAVLAuth(slug);
 
   const [activeSession, setActiveSession] = useState<SessionRow | null>(null);
@@ -76,7 +81,7 @@ export default function Dashboard() {
   const handleLogout = () => {
     clearAuth(slug);
     refreshAuth();
-    alert('Você saiu da quadra. PIN resetado!');
+    toast.show('Você saiu da quadra. PIN resetado!');
   };
 
   const formatWhen = (start?: string, end?: string | null) => {
@@ -88,155 +93,129 @@ export default function Dashboard() {
     return end ? `${day} · ${hour(s)} às ${hour(new Date(end))}` : `${day} · ${hour(s)}`;
   };
 
-  if (loadingData) return <LoadingScreen />;
+  const shell = (children: React.ReactNode) => (
+    <div className="min-h-screen bg-bg text-ink p-4 pb-28 max-w-md mx-auto flex flex-col gap-3">
+      <AppHeader
+        title="Dashboard"
+        right={isAdmin ? (
+          <>
+            <AdminTag />
+            <Button size="sm" inline onClick={handleLogout} className="!min-h-9 !px-3 !py-1 !text-sm text-ink">Sair</Button>
+          </>
+        ) : undefined}
+      />
+      {children}
+      <p className="text-center text-xs font-bold text-muted mt-2">© {new Date().getFullYear()} Desenvolvido por Amigos do Vôlei</p>
+    </div>
+  );
+
+  if (loadingData) {
+    return shell(
+      <div className="text-center py-16">
+        <div className="text-6xl animate-bounce" aria-hidden="true">🏐</div>
+        <p className="font-display font-bold text-xl mt-3">Penteando a areia...</p>
+      </div>,
+    );
+  }
 
   const hasSession = Boolean(activeSession);
   const hasTeams = Boolean(activeSession?.champion_name && activeSession?.challenger_name);
   const [liveA, liveB] = countSets(sessionSets);
   const lastShown = !activeSession && lastEndedSession?.champion_name ? lastEndedSession : null;
 
-  return (
-    <div className="min-h-screen bg-green-100 p-4 pb-28 max-w-md mx-auto relative font-sans">
-      <header className="flex justify-between items-center mb-6 bg-white p-4 rounded-[2rem] shadow-sm border-b-8 border-green-200">
-        <div className="flex items-center gap-3 flex-1">
-          <img src="/logo.png" alt="Mascote" className="h-16 object-contain drop-shadow-md" />
-          <div className="flex flex-col transform -rotate-2">
-            <span className="font-black text-3xl tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-red-500 to-red-700 drop-shadow-[2px_2px_0_rgba(0,0,0,0.8)] leading-none mb-1">
-              AMIGOS
-            </span>
-            <span className="font-black text-2xl tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-yellow-400 to-orange-500 drop-shadow-[2px_2px_0_rgba(0,0,0,0.8)] leading-none ml-2">
-              DO VÔLEI
-            </span>
-          </div>
-        </div>
-        {isAdmin && (
-          <button onClick={handleLogout} className="bg-red-100 text-red-600 font-black px-4 py-2 rounded-xl text-sm border-b-4 border-red-200 active:translate-y-1 ml-4 transition-all">
-            Sair
-          </button>
-        )}
-      </header>
-
+  return shell(
+    <>
       {/* Estado da quadra */}
-      <div className={`p-6 rounded-[2rem] shadow-lg border-b-8 mb-5 ${hasSession ? 'bg-orange-500 border-orange-700' : 'bg-white border-green-300'}`}>
-        {!hasSession && (
-          <>
-            <h2 className="text-2xl font-black mb-1 text-green-800">Quadra livre 😴</h2>
-            {isAdmin ? (
-              <button onClick={() => adminGo(`/g/${slug}/setup`)} className="mt-4 w-full bg-green-500 text-white text-2xl font-black py-5 rounded-2xl border-b-4 border-green-700 active:border-b-0 active:translate-y-1 transition-all shadow-sm">
-                INICIAR RODADA 🏐
-              </button>
-            ) : (
-              <>
-                <p className="text-gray-500 font-bold">Aguardando o admin iniciar a rodada.</p>
-                <button onClick={() => adminGo(`/g/${slug}/setup`)} className="mt-4 w-full bg-green-500 text-white text-xl font-black py-4 rounded-2xl border-b-4 border-green-700 active:border-b-0 active:translate-y-1 transition-all shadow-sm">
-                  Sou admin: iniciar rodada
-                </button>
-              </>
-            )}
-          </>
-        )}
+      {!hasSession && (
+        <Card slim>
+          <div className="flex items-center justify-center gap-2.5">
+            <span className="text-3xl" aria-hidden="true">😴</span>
+            <h2 className="text-xl font-bold">Quadra livre</h2>
+          </div>
+          {isAdmin ? (
+            <Button variant="sun" onClick={() => adminGo(`/g/${slug}/setup`)}>Iniciar rodada</Button>
+          ) : (
+            <>
+              <Sub className="text-center">Aguardando o admin iniciar a rodada.</Sub>
+              <Button size="sm" onClick={() => adminGo(`/g/${slug}/setup`)}>Sou admin: iniciar rodada</Button>
+            </>
+          )}
+        </Card>
+      )}
 
-        {hasSession && !hasTeams && (
-          <>
-            <h2 className="text-2xl font-black mb-1 text-white">Rodada rolando</h2>
-            <p className="text-orange-50 font-bold">Os times ainda não foram definidos.</p>
-            {isAdmin && (
-              <button onClick={() => router.push(`/g/${slug}/setup`)} className="mt-4 w-full bg-white text-orange-600 text-xl font-black py-5 rounded-2xl border-b-4 border-gray-200 active:border-b-0 active:translate-y-1 transition-all shadow-sm">
-                CONFIGURAR TIMES 🤼
-              </button>
-            )}
-          </>
-        )}
+      {hasSession && !hasTeams && (
+        <Card slim>
+          <h2 className="text-xl font-bold">Rodada rolando</h2>
+          <Sub>Os times ainda não foram definidos.</Sub>
+          {isAdmin && <Button variant="sun" onClick={() => router.push(`/g/${slug}/setup`)}>Configurar times</Button>}
+        </Card>
+      )}
 
-        {hasSession && hasTeams && (
-          <>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-white" />
-              </span>
-              <span className="text-white font-black text-sm tracking-widest">AO VIVO</span>
-              <span className="text-orange-100 font-bold text-xs ml-auto">{formatWhen(activeSession?.created_at)}</span>
-            </div>
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center text-center text-white gap-2">
-              <span className="font-black text-sm">{CHAMPION_NAME}</span>
-              <span className="font-black text-5xl tabular-nums">{liveA} x {liveB}</span>
-              <span className="font-black text-sm">{CHALLENGER_NAME}</span>
-            </div>
-            <button onClick={() => router.push(`/g/${slug}/game`)} className="mt-4 w-full bg-green-400 text-green-900 text-2xl font-black py-4 rounded-2xl border-b-4 border-green-600 active:border-b-0 active:translate-y-1 transition-all shadow-sm">
-              ABRIR PLACAR 🎮
-            </button>
-          </>
-        )}
-      </div>
+      {hasSession && hasTeams && (
+        <Card slim>
+          <div className="flex items-center justify-between">
+            <span className="inline-flex items-center gap-1.5 font-extrabold text-xs tracking-[0.06em] text-danger">
+              <span aria-hidden="true" className="w-2.5 h-2.5 rounded-full bg-danger" />
+              AO VIVO
+            </span>
+            <span className="text-xs font-bold text-muted">{formatWhen(activeSession?.created_at)}</span>
+          </div>
+          <Scoreboard a={liveA} b={liveB} />
+          <Button variant="sea" size="sm" onClick={() => router.push(`/g/${slug}/game`)}>Abrir placar</Button>
+        </Card>
+      )}
 
-      {/* Último confronto */}
+      {/* Último confronto: sempre aberto, com os placares lado a lado */}
       {lastShown && (() => {
         const [a, b] = countSets(sessionSets);
-        const champ = lineupNames(lastShown.champion_name, lastShown.champion_player_ids, playersMap);
-        const chall = lineupNames(lastShown.challenger_name, lastShown.challenger_player_ids, playersMap);
         return (
-          <div className="bg-white rounded-[1.5rem] p-4 shadow-md border-b-4 border-sky-200 mb-5">
-            <div className="flex justify-between items-center mb-3 border-b border-sky-50 pb-2">
-              <span className="text-sky-600 font-black text-xs tracking-widest uppercase">🏖️ Último confronto</span>
-              <span className="text-xs text-gray-400 font-bold">{formatWhen(lastShown.created_at, lastShown.ended_at)}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { title: CHAMPION_NAME, n: a, win: a > b, list: champ, color: 'text-green-700' },
-                { title: CHALLENGER_NAME, n: b, win: b > a, list: chall, color: 'text-orange-600' },
-              ].map((t) => (
-                <div key={t.title} className={`rounded-2xl border-2 p-2 text-center ${t.win ? 'border-yellow-400 bg-yellow-50' : 'border-gray-100 bg-gray-50'}`}>
-                  <div className={`font-black text-sm ${t.color}`}>{t.title}</div>
-                  <div className="font-black text-4xl text-gray-800 tabular-nums" aria-label={`${t.n} sets`}>{t.n}</div>
-                  <ul className="text-sm font-bold text-gray-600 leading-snug">
-                    {t.list.map((p, i) => (
-                      <li key={i}>{p.name}{p.captain && <span className="ml-1 text-[10px] font-black text-orange-500 uppercase">cap.</span>}</li>
-                    ))}
-                  </ul>
+          <Card slim>
+            <Eyebrow>Último confronto · {formatWhen(lastShown.created_at, lastShown.ended_at)}</Eyebrow>
+            <div className="grid grid-cols-2 gap-2.5">
+              {([
+                { side: 'champion', n: a, win: a > b, list: lineupNames(lastShown.champion_name, lastShown.champion_player_ids, playersMap) },
+                { side: 'challenger', n: b, win: b > a, list: lineupNames(lastShown.challenger_name, lastShown.challenger_player_ids, playersMap) },
+              ] as const).map((t) => (
+                <div key={t.side} className="flex flex-col gap-1.5">
+                  <div className="font-display font-bold text-4xl leading-none text-center tabular-nums" aria-label={`${t.n} sets`}>{t.n}</div>
+                  <Lineup side={t.side} players={t.list} win={t.win} />
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
         );
       })()}
 
       {/* Top 5 do mês: posições 1 a 5, empatados juntos e um embaixo do outro */}
-      <div className="bg-white rounded-[2rem] p-5 shadow-sm border-b-8 border-green-200 mb-6 relative overflow-hidden">
-        <h3 className="text-xl font-black text-green-800 mb-4">🏆 Top 5 do Mês</h3>
-        <div className="flex flex-col gap-3">
+      <Card slim>
+        <div className="flex items-center gap-2">
+          <h2 className="flex-1 text-lg font-bold">Top 5 do mês</h2>
+          <Chip onClick={() => router.push(`/g/${slug}/ranking`)}>Ver tudo</Chip>
+        </div>
+        <div className="flex flex-col gap-2">
           {top5(rankings).map((g) => (
             <div
               key={g.position}
-              className={`flex items-start gap-3 p-3 rounded-2xl border-2 ${
-                g.position === 1 ? 'bg-yellow-100 border-yellow-300' : g.position === 2 ? 'bg-gray-100 border-gray-300' : g.position === 3 ? 'bg-orange-100 border-orange-300' : 'bg-green-50 border-green-100'
-              }`}
+              className={`flex items-start gap-3 px-3 py-2 rounded-[16px] border-2 ${g.position <= 3 ? `${MEDAL_BG[g.position - 1]} border-line` : 'bg-surface2 border-soft'}`}
             >
-              <span className="w-10 text-center font-black text-2xl text-green-900" aria-label={`${g.position}º lugar`}>
+              <span className="w-9 text-center font-display font-bold text-xl pt-0.5" aria-label={`${g.position}º lugar`}>
                 {MEDALS[g.position] ?? `${g.position}º`}
               </span>
-              <ul className="flex-1 min-w-0 font-black text-green-900 text-lg leading-snug">
+              <ul className="flex-1 min-w-0 font-extrabold">
                 {g.shown.map((p, i) => (
-                  <li key={`${p.name}-${i}`}>
+                  <li key={`${p.name}-${i}`} className="min-h-7 flex items-center">
                     {p.name}
-                    {p.is_guest && <small className="ml-2 text-xs font-bold text-gray-500">visitante</small>}
+                    {p.is_guest && <small className="ml-1.5 text-[13px] font-bold text-muted">visitante</small>}
                   </li>
                 ))}
-                {g.more > 0 && <li className="text-sm font-bold text-gray-500">+{g.more} no mesmo placar</li>}
+                {g.more > 0 && <li className="text-[13px] font-bold text-muted">+{g.more} no mesmo placar</li>}
               </ul>
-              <span className="bg-white/70 text-green-900 px-3 py-1 rounded-xl font-black">{g.points} pts</span>
+              <span className="font-display font-bold pt-0.5">{g.points} pts</span>
             </div>
           ))}
-          {rankings.length === 0 && (
-            <div className="bg-gray-50 rounded-2xl p-6 text-center border-2 border-dashed border-gray-200">
-              <p className="text-gray-400 font-bold">Nenhum ponto marcado esse mês. 🏐</p>
-            </div>
-          )}
+          {rankings.length === 0 && <Sub className="text-center py-3">Nenhum ponto marcado esse mês. 🏐</Sub>}
         </div>
-        <button onClick={() => router.push(`/g/${slug}/ranking`)} className="mt-4 w-full text-blue-600 font-black text-base py-2">
-          Ver ranking completo →
-        </button>
-      </div>
+      </Card>
 
       {pinOpen && (
         <PinModal
@@ -250,18 +229,6 @@ export default function Dashboard() {
           onClose={() => setPinOpen(false)}
         />
       )}
-
-    </div>
-  );
-}
-
-function LoadingScreen() {
-  return (
-    <div className="min-h-screen bg-green-400 flex items-center justify-center">
-      <div className="text-center">
-        <div className="text-7xl animate-bounce mb-4 drop-shadow-lg">🏐</div>
-        <h2 className="text-white font-black text-2xl tracking-widest">Penteando a areia...</h2>
-      </div>
-    </div>
+    </>,
   );
 }

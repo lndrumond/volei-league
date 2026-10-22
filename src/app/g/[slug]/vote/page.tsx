@@ -2,6 +2,8 @@
 
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState, Suspense } from 'react';
+import { Button, Card, EmptyState, GuestTag, Sub, useToast } from '@/components/ui';
+import AppHeader from '@/components/AppHeader';
 
 interface TargetPlayer {
   id: string;
@@ -9,10 +11,23 @@ interface TargetPlayer {
   is_guest: boolean;
 }
 
+const FIELD = 'w-full bg-surface2 text-ink border-[3px] border-line rounded-[14px] px-3 py-3 min-h-14 text-center text-3xl font-display font-bold tracking-[0.3em]';
+
+// Frases cômicas por faixa de nota (a nota em si é secreta).
+const scoreLabel = (score: number) => {
+  if (score <= 2) return 'Joga fofo 🧸';
+  if (score <= 4) return 'Muitas furadas 🥊';
+  if (score <= 6) return 'Tá na média 📊';
+  if (score <= 8) return 'Acima da média 🚀';
+  if (score === 9) return 'Puxa a responsa ⚡';
+  return 'Estrela do Vôlei ⭐';
+};
+
 function VoteContent() {
   const { slug } = useParams() as { slug: string };
   const router = useRouter();
   const searchParams = useSearchParams();
+  const toast = useToast();
 
   const initialPin = searchParams.get('pin') || '';
 
@@ -45,14 +60,12 @@ function VoteContent() {
 
         // Inicializa todas as notas com 5
         const initialScores: Record<string, number> = {};
-        (data.targets || []).forEach((t: TargetPlayer) => {
-          initialScores[t.id] = 5;
-        });
+        (data.targets || []).forEach((t: TargetPlayer) => { initialScores[t.id] = 5; });
         setScores(initialScores);
       } else {
         setErrorMsg(data.message || 'PIN inválido.');
       }
-    } catch (err) {
+    } catch {
       setErrorMsg('Erro ao conectar à quadra.');
     } finally {
       setLoading(false);
@@ -60,9 +73,7 @@ function VoteContent() {
   };
 
   useEffect(() => {
-    if (initialPin) {
-      validatePin(initialPin);
-    }
+    if (initialPin) validatePin(initialPin);
   }, [initialPin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleScoreChange = (targetId: string, value: number) => {
@@ -75,208 +86,126 @@ function VoteContent() {
 
     setSubmitting(true);
     try {
-      const formattedVotes = Object.entries(scores).map(([target_id, score]) => ({
-        target_id,
-        score,
-      }));
+      const formattedVotes = Object.entries(scores).map(([target_id, score]) => ({ target_id, score }));
 
       const res = await fetch('/api/vote/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          slug,
-          pin: activePin,
-          votes: formattedVotes,
-        }),
+        body: JSON.stringify({ slug, pin: activePin, votes: formattedVotes }),
       });
 
       const data = await res.json();
-      if (data.ok) {
-        setSubmitted(true);
-      } else {
-        alert(data.error || 'Erro ao enviar votos.');
-      }
-    } catch (err) {
-      alert('Erro de conexão ao salvar votos.');
+      if (data.ok) setSubmitted(true);
+      else toast.error(data.error || 'Erro ao enviar votos.');
+    } catch {
+      toast.error('Erro de conexão ao salvar votos.');
     } finally {
       setSubmitting(false);
     }
   };
 
-const getScoreLabel = (score: number) => {
-    // <= 2: Vermelho (Alerta leve / Iniciante)
-    if (score <= 2) return { text: 'Joga fofo 🧸', color: 'text-red-700 bg-red-100' };
-    
-    // <= 4: Laranja/Amber (Evoluindo)
-    if (score <= 4) return { text: 'Muitas furadas 🥊', color: 'text-orange-700 bg-orange-100' };
-    
-    // <= 6: Verde (Equilibrado / Seguro)
-    if (score <= 6) return { text: 'Tá na média 📊', color: 'text-green-700 bg-green-100' };
-    
-    // <= 8: Indigo (Habilidade avançada e firme)
-    if (score <= 8) return { text: 'Acima da média 🚀', color: 'text-indigo-700 bg-indigo-100' };
-    
-    // == 9: Rosa/Fúcsia (Destaque total, energia pura)
-    if (score == 9) return { text: 'Puxa a responsa ⚡', color: 'text-pink-700 bg-pink-100' };
-    
-    // Nível 10: Dourado/Amarelo Âmbar de Elite
-    return { text: 'Estrela do Vôlei ⭐', color: 'text-amber-700 bg-amber-200' };
-  };
+  const shell = (children: React.ReactNode, extraBottom = false) => (
+    <div className={`min-h-screen bg-bg text-ink p-4 ${extraBottom ? 'pb-32' : 'pb-10'} max-w-md mx-auto flex flex-col gap-3`}>
+      <AppHeader title="Urna" />
+      {children}
+    </div>
+  );
 
   // --- 1. TELA DE SUCESSO ---
   if (submitted) {
-    return (
-      <div className="min-h-screen bg-green-500 text-white flex flex-col items-center justify-center p-6 text-center">
-        <div className="bg-white text-gray-900 rounded-[2.5rem] p-8 max-w-sm w-full shadow-2xl border-b-8 border-green-700 animate-in zoom-in duration-300">
-          <div className="text-7xl mb-4 animate-bounce">🗳️✅</div>
-          <h1 className="text-3xl font-black text-green-700 mb-2 leading-tight">Votos Salvos!</h1>
-          <p className="text-gray-600 font-bold mb-6">
-            Obrigado, <span className="text-green-800">{voterName}</span>! Suas avaliações foram guardadas a sete chaves no cofre do Yoshi. 🤫
-          </p>
-          <button
-            onClick={() => router.push(`/g/${slug}`)}
-            className="w-full bg-orange-500 text-white font-black py-4 rounded-2xl text-xl border-b-4 border-orange-700 active:translate-y-1 transition-all shadow-md"
-          >
-            VOLTAR PRO JOGO 🏐
-          </button>
-        </div>
-      </div>
+    return shell(
+      <EmptyState
+        icon="🗳️"
+        title="Votos salvos!"
+        text={`Obrigado, ${voterName}! Suas avaliações foram guardadas a sete chaves. 🤫`}
+        action={<Button variant="sun" onClick={() => router.push(`/g/${slug}`)}>Voltar pro jogo</Button>}
+      />,
     );
   }
 
-  // --- 2. TELA DE DIGITAR PIN (Caso não tenha PIN válido na URL ou deu erro) ---
+  // --- 2. TELA DE DIGITAR PIN (sem PIN válido na URL, ou deu erro) ---
   if (!activePin) {
-    return (
-      <div className="min-h-screen bg-green-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-sm shadow-2xl border-b-8 border-green-500 text-center font-sans">
-          <div className="text-6xl mb-3">🗳️</div>
-          <h1 className="text-3xl font-black text-green-900 mb-1 leading-tight">Urna Eletrônica</h1>
-          <p className="text-gray-500 font-bold text-sm mb-6">Digite seu PIN de votação de 4 dígitos</p>
-
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              validatePin(pinInput);
-            }}
-            className="flex flex-col gap-4"
-          >
-            <input
-              type="text"
-              value={pinInput}
-              onChange={(e) => setPinInput(e.target.value)}
-              placeholder="****"
-              maxLength={6}
-              className="text-center text-4xl font-black p-4 rounded-2xl bg-green-50 border-4 border-green-200 text-green-900 focus:outline-none focus:border-orange-500 transition-colors tracking-widest"
-              autoFocus
-            />
-
-            {errorMsg && (
-              <div className="bg-red-100 text-red-700 font-bold p-3 rounded-xl text-sm border-2 border-red-200">
-                {errorMsg}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading || !pinInput.trim()}
-              className="bg-orange-500 text-white text-2xl font-black py-4 rounded-2xl border-b-8 border-orange-700 active:border-b-0 active:translate-y-2 transition-all disabled:opacity-50 mt-2"
-            >
-              {loading ? 'VALIDANDO...' : 'ENTRAR NA URNA 🔥'}
-            </button>
-          </form>
-
-          <button
-            onClick={() => router.push(`/g/${slug}`)}
-            className="mt-6 text-gray-400 font-bold text-xs hover:text-gray-600 transition-colors"
-          >
-            ◀ Voltar para a Liga
-          </button>
+    return shell(
+      <Card>
+        <div className="text-center">
+          <div className="text-5xl" aria-hidden="true">🗳️</div>
+          <h1 className="text-2xl font-bold mt-1">Urna Eletrônica</h1>
+          <Sub className="mt-1">Digite seu PIN de votação</Sub>
         </div>
-      </div>
+        <form onSubmit={(e) => { e.preventDefault(); validatePin(pinInput); }} className="flex flex-col gap-3">
+          <label htmlFor="votepin" className="sr-only">PIN de votação</label>
+          <input
+            id="votepin"
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            value={pinInput}
+            onChange={(e) => setPinInput(e.target.value)}
+            placeholder="••••"
+            maxLength={6}
+            className={FIELD}
+          />
+          {errorMsg && <p role="alert" className="font-bold text-danger text-center">{errorMsg}</p>}
+          <Button type="submit" variant="sun" disabled={loading || !pinInput.trim()}>{loading ? 'Validando...' : 'Entrar na urna'}</Button>
+        </form>
+        <Button size="sm" onClick={() => router.push(`/g/${slug}`)}>Voltar para a liga</Button>
+      </Card>,
     );
   }
 
   // --- 3. FORMULÁRIO DE VOTAÇÃO ---
-  return (
-    <div className="min-h-screen bg-green-50 p-4 pb-32 max-w-md mx-auto font-sans relative">
-      {/* Header */}
-      <div className="bg-white p-5 rounded-[2rem] shadow-md border-b-8 border-green-200 mb-6 text-center">
-        <div className="text-5xl mb-2">🤫</div>
-        <h1 className="text-2xl font-black text-green-900 leading-tight">
-          Bem-vindo, <span className="text-orange-500">{voterName}</span>!
-        </h1>
-        <p className="text-xs text-gray-500 font-bold mt-1">
-          Dê as notas dos parceiros de quadra. As notas são 100% secretas e servem para equilibrar os times! 
-        </p>
-        <p className="text-xs text-red-500 font-bold mt-1">
-          Notas de 1 a 10. Seja justo para equilibrar os times. 
-        </p>
-      </div>
+  return shell(
+    <>
+      <Card slim className="text-center">
+        <div className="text-4xl" aria-hidden="true">🤫</div>
+        <h1 className="text-xl font-bold">Bem-vindo, {voterName}!</h1>
+        <Sub>Dê as notas dos parceiros de quadra. As notas são 100% secretas e servem para equilibrar os times.</Sub>
+        <p className="text-sm font-bold text-danger">Notas de 1 a 10. Seja justo para equilibrar os times.</p>
+      </Card>
 
-      {/* Lista de Alvos */}
-      <form onSubmit={handleSubmitVotes} className="flex flex-col gap-4">
+      <form onSubmit={handleSubmitVotes} className="flex flex-col gap-3">
         {targets.length === 0 ? (
-          <div className="bg-white p-6 rounded-[2rem] text-center text-gray-500 font-bold">
-            Nenhum outro jogador disponível para votar nesta rodada.
-          </div>
+          <Card slim><Sub className="text-center">Nenhum outro jogador disponível para votar nesta rodada.</Sub></Card>
         ) : (
           targets.map((target) => {
-            const currentScore = scores[target.id] || 5;
-            const labelInfo = getScoreLabel(currentScore);
-
+            const current = scores[target.id] || 5;
             return (
-              <div
-                key={target.id}
-                className="bg-white p-5 rounded-[2rem] shadow-sm border-b-4 border-gray-200 flex flex-col gap-3"
-              >
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <span className="font-black text-xl text-gray-900">{target.name}</span>
-                    {target.is_guest && (
-                      <span className="text-[10px] bg-orange-100 text-orange-700 font-bold px-2 py-0.5 rounded-full">
-                        Visitante
-                      </span>
-                    )}
-                  </div>
-                  <div className={`font-black text-sm px-3 py-1 rounded-xl ${labelInfo.color}`}>
-                    {labelInfo.text}
-                  </div>
+              <Card key={target.id} slim>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-display font-bold text-xl min-w-0 truncate">
+                    {target.name}
+                    {target.is_guest && <GuestTag />}
+                  </span>
+                  <span className="shrink-0 font-extrabold text-sm bg-surface2 border-2 border-soft rounded-full px-3 py-1">{scoreLabel(current)}</span>
                 </div>
-
-                {/* Slider de 1 a 10 */}
-                <div className="flex items-center gap-4 pt-1">
-                  <span className="font-black text-gray-400 text-sm">1</span>
+                <div className="flex items-center gap-3">
+                  <span className="font-extrabold text-muted text-sm">1</span>
                   <input
                     type="range"
                     min="1"
                     max="10"
                     step="1"
-                    value={currentScore}
+                    value={current}
+                    aria-label={`Nota para ${target.name}`}
                     onChange={(e) => handleScoreChange(target.id, parseInt(e.target.value))}
-                    className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                    className="w-full h-3 cursor-pointer accent-sea"
                   />
-                  <span className="font-black text-gray-400 text-sm">10</span>
-                  <span className="bg-orange-500 text-white font-black text-xl px-3 py-1 rounded-xl min-w-[2.5rem] text-center shadow-sm">
-                    {currentScore}
-                  </span>
+                  <span className="font-extrabold text-muted text-sm">10</span>
+                  <span className="bg-sun text-sun-ink border-2 border-line font-display font-bold text-xl px-2.5 py-0.5 rounded-[12px] min-w-11 text-center tabular-nums">{current}</span>
                 </div>
-              </div>
+              </Card>
             );
           })
         )}
 
-        {/* Botão Fixo no Rodapé */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-green-50 via-green-50/90 to-transparent z-40 max-w-md mx-auto">
-          <button
-            type="submit"
-            disabled={submitting || targets.length === 0}
-            className="w-full bg-orange-500 text-white text-2xl font-black py-5 rounded-[2rem] border-b-8 border-orange-700 active:border-b-0 active:translate-y-2 transition-all shadow-lg disabled:opacity-50 flex justify-center items-center gap-2"
-          >
-            {submitting ? 'ENVIANDO VOTOS...' : 'ENVIAR VOTOS NA URNA 🗳️'}
-          </button>
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-bg border-t-[3px] border-line z-40">
+          <div className="max-w-md mx-auto">
+            <Button type="submit" variant="sun" disabled={submitting || targets.length === 0}>{submitting ? 'Enviando votos...' : 'Enviar votos na urna 🗳️'}</Button>
+          </div>
         </div>
       </form>
-    </div>
+    </>,
+    true,
   );
 }
 
@@ -284,8 +213,8 @@ export default function VotePage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-green-50 flex items-center justify-center p-4">
-          <h2 className="text-green-800 font-black text-2xl animate-pulse">Carregando Urna... 🗳️</h2>
+        <div className="min-h-screen bg-bg text-ink flex items-center justify-center p-4">
+          <h2 className="font-display font-bold text-2xl animate-pulse">Carregando urna... 🗳️</h2>
         </div>
       }
     >
@@ -293,4 +222,3 @@ export default function VotePage() {
     </Suspense>
   );
 }
-
