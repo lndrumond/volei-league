@@ -156,6 +156,11 @@ Objetivo: fixar como as telas funcionam antes de implementar. Não é o visual f
 ## Fase B: Visual
 
 ### B1. Tema e tokens
+**Status: código pronto na branch `fase-a-etapa-a1` (22/10/2026), aguardando confirmação do dono do sistema visual. Nenhuma tela foi alterada ainda (isso é a B3).**
+- **Feito:** `src/app/globals.css` com os tokens do mockup aprovado, em tema claro e escuro (`prefers-color-scheme`, com `data-theme` para forçar): fundo `bg`, `surface`, `surface2`, texto `ink`, `muted`, contorno `line`, `soft`; cores `sea` (azul-mar, Sem Colete), `vest` (laranja, Com Colete), `sun` (amarelo-sol, ação principal), `danger`, `ok`; medalhas `gold`, `silver`, `bronze`. Viram classes do Tailwind (`bg-surface`, `text-ink`, `bg-sea`, `rounded-card`, `shadow-pop`...). Fontes por `next/font`: Fredoka (títulos) e Nunito (texto). Raios 22 e 16 px, sombra de botão "fliperama" (`0 4px 0`). Foco visível e respeito a "reduzir movimento".
+- **Efeito imediato nas telas atuais:** só a fonte do texto (Nunito no lugar de Arial) e a cor de fundo do corpo. As telas ainda usam as classes antigas até a B3.
+- **Verificado:** `tsc` sem erros e `next build` completo, com as variáveis de fonte emitidas no CSS final.
+- **A confirmar com o dono:** paleta, fontes e o tom (descontraído e esportivo, com cara de app de respeito) antes da B2.
 - Paleta, tipografia e espaçamento a partir do mockup aprovado em 0.1, no Tailwind.
 - Confirmar o sistema visual completo com o dono antes de aplicar.
 - **Modelo sugerido:** Opus 5.5 (decisão de sistema visual).
@@ -205,6 +210,7 @@ Objetivo: fixar como as telas funcionam antes de implementar. Não é o visual f
 ---
 
 ## Histórico de alterações
+- **22/10/2026 (B1, código):** tokens de tema (claro e escuro), fontes Fredoka e Nunito e utilidades do Tailwind. Telas não alteradas. `tsc` e `next build` sem erros. Dois commits locais da Fase A feitos antes (`ddff105` código e `634e168` documentos), sem push.
 - **22/10/2026 (A6 concluída):** dono apagou os registros de teste. Conferência por leitura: banco idêntico ao de antes (78/431/38, 0 ativas, ranking com os mesmos totais). Servidor local (`npm run dev`) encerrado a pedido do dono. Commits locais autorizados pelo dono, sem push e sem deploy; deploy só com autorização explícita. A7 (deploy) fica depois da Fase B, por decisão do dono (o visual ainda não foi aplicado).
 - **22/10/2026 (A6, teste de escrita):** com autorização do dono, rodei o roteiro pela API (token de Super Admin) no banco de produção, só com 4 jogadores de teste, 2 partidas e 3 sets. 34 verificações OK. Ranking real do mês idêntico ao de antes. Ids e SQL de limpeza em `plan-a6-limpeza.md`; dono apaga manualmente. Nada apagado por mim. Nenhum commit ou deploy.
 - **22/10/2026 (A5 aprovada, ajustes no Histórico):** dono aprovou a A5. No Histórico, toda rodada passou a ser sanfona como no mockup (`<details>`: data, quantidade e seta; abre sozinha com até 2 partidas e fecha com mais), podendo abrir e fechar qualquer uma; antes só as de mais de 2 partidas tinham botão. Texto "Areia esfriou" e nota "Rodadas abortadas, sem times, não aparecem aqui." do mockup. Barra inferior subiu acima do rodapé do layout raiz, que a cobria no fim da página. Testado em navegador sem interface (abrir e fechar rodadas de 1, 2 e 5 partidas) e com capturas de tela. Samuel duplicado: dono deixa inativo e verá depois; nenhuma ação.

@@ -1,5 +1,10 @@
 import type { Metadata } from 'next';
+import { Fredoka, Nunito } from 'next/font/google';
 import './globals.css';
+
+// Títulos em Fredoka (arredondada, esportiva) e texto em Nunito (legível em tela pequena).
+const fredoka = Fredoka({ subsets: ['latin'], weight: ['500', '600', '700'], variable: '--font-fredoka', display: 'swap' });
+const nunito = Nunito({ subsets: ['latin'], weight: ['500', '700', '800'], variable: '--font-nunito', display: 'swap' });
 
 export const metadata: Metadata = {
   title: 'AVL | Amigos do Vôlei League',
@@ -15,8 +20,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR">
-      <body className="flex flex-col min-h-screen bg-gray-100">
+    <html lang="pt-BR" className={`${fredoka.variable} ${nunito.variable}`}>
+      <body className="flex flex-col min-h-screen bg-bg text-ink font-body">
         
         <main className="flex-1">
           {children}

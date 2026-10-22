@@ -1,26 +1,141 @@
 @import "tailwindcss";
 
+/*
+  Sistema visual AVL (Fase B1), a partir do mockup aprovado em 0.1.
+  Paleta: azul-mar, laranja de colete e amarelo-sol. Tema claro e escuro por tokens.
+  As telas usam os tokens por classes do Tailwind (bg-surface, text-ink, bg-sea...).
+*/
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  --bg: #E8F1F6;
+  --surface: #FFFFFF;
+  --surface2: #F1F7FA;
+  --ink: #0F2A43;
+  --muted: #46606F;
+  --line: #0F2A43;
+  --soft: #C6D9E5;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --sea: #1479B8;
+  --sea-ink: #FFFFFF;
+  --vest: #F5922B;
+  --vest-ink: #2A1700;
+  --sun: #FFC83D;
+  --sun-ink: #0F2A43;
+  --danger: #C93A3A;
+  --danger-ink: #FFFFFF;
+  --ok: #16774B;
+
+  /* medalhas: ouro, prata, bronze (fundos suaves) */
+  --gold: #FFEDB0;
+  --silver: #DCE8F1;
+  --bronze: #F8DCC2;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:not([data-theme="light"]) {
+    --bg: #08172A;
+    --surface: #112B44;
+    --surface2: #0D2238;
+    --ink: #EAF4FA;
+    --muted: #9DB6C8;
+    --line: #040D18;
+    --soft: #25465F;
+    --sea: #4DB0E8;
+    --sea-ink: #04223A;
+    --vest: #F5A04A;
+    --vest-ink: #2A1700;
+    --sun: #FFC83D;
+    --sun-ink: #0F2A43;
+    --danger: #F06A6A;
+    --danger-ink: #2A0505;
+    --ok: #4CC58C;
+    --gold: #5A4A12;
+    --silver: #34495C;
+    --bronze: #5A3A20;
+    color-scheme: dark;
   }
 }
 
+:root[data-theme="dark"] {
+  --bg: #08172A;
+  --surface: #112B44;
+  --surface2: #0D2238;
+  --ink: #EAF4FA;
+  --muted: #9DB6C8;
+  --line: #040D18;
+  --soft: #25465F;
+  --sea: #4DB0E8;
+  --sea-ink: #04223A;
+  --vest: #F5A04A;
+  --vest-ink: #2A1700;
+  --sun: #FFC83D;
+  --sun-ink: #0F2A43;
+  --danger: #F06A6A;
+  --danger-ink: #2A0505;
+  --ok: #4CC58C;
+  --gold: #5A4A12;
+  --silver: #34495C;
+  --bronze: #5A3A20;
+  color-scheme: dark;
+}
+
+/* Tokens como utilidades do Tailwind: bg-bg, bg-surface, text-ink, border-line, bg-sea, bg-sun... */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface2: var(--surface2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-soft: var(--soft);
+  --color-sea: var(--sea);
+  --color-sea-ink: var(--sea-ink);
+  --color-vest: var(--vest);
+  --color-vest-ink: var(--vest-ink);
+  --color-sun: var(--sun);
+  --color-sun-ink: var(--sun-ink);
+  --color-danger: var(--danger);
+  --color-danger-ink: var(--danger-ink);
+  --color-ok: var(--ok);
+  --color-gold: var(--gold);
+  --color-silver: var(--silver);
+  --color-bronze: var(--bronze);
+
+  --font-display: var(--font-fredoka), 'Trebuchet MS', system-ui, sans-serif;
+  --font-body: var(--font-nunito), system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-sans: var(--font-nunito), system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --radius-card: 22px;
+  --radius-inner: 16px;
+  --shadow-pop: 0 4px 0 var(--line);
+  --shadow-press: 0 1px 0 var(--line);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  text-wrap: balance;
+}
+
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+
+/* Foco sempre visível, para quem navega por teclado. */
+:focus-visible {
+  outline: 3px solid var(--sea);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
