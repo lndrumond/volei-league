@@ -38,16 +38,24 @@ export const getStoredRole = (slug: string): Role => {
   return 'viewer';
 };
 
+// Avisa a barra inferior (e quem mais ouvir) que o login mudou, sem precisar recarregar a página.
+export const AUTH_EVENT = 'avl-auth';
+export const notifyAuthChange = () => {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(AUTH_EVENT));
+};
+
 export const saveAuth = (slug: string, token: string, role: string) => {
   if (typeof window === 'undefined') return;
   localStorage.setItem(`avl_token_${slug}`, token);
   localStorage.setItem(`avl_role_${slug}`, role);
+  notifyAuthChange();
 };
 
 export const clearAuth = (slug: string) => {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(`avl_token_${slug}`);
   localStorage.removeItem(`avl_role_${slug}`);
+  notifyAuthChange();
 };
 
 // --- FETCH HELPER (Intercepta erros 401 de PIN inválido/expirado) ---

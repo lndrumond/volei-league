@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { saveAuth } from '@/lib/avlClient';
+import { saveAuth, notifyAuthChange } from '@/lib/avlClient';
 import { Button, Card, Chip, Sub, useToast } from '@/components/ui';
 import AppHeader from '@/components/AppHeader';
 
@@ -98,6 +98,7 @@ export default function SuperAdminPage() {
     const res = await fetch(url, { ...init, headers });
     if (res.status === 401 || res.status === 403) {
       sessionStorage.removeItem(`superadmin_${slug}`);
+      notifyAuthChange();
       setAuthenticated(false);
       setAuthError('Sessão expirada. Digite a senha de novo.');
     }
@@ -248,7 +249,7 @@ export default function SuperAdminPage() {
   );
 
   const shell = (children: React.ReactNode, right?: React.ReactNode) => (
-    <div className="min-h-screen bg-bg text-ink p-4 pb-16 max-w-lg mx-auto flex flex-col gap-3">
+    <div className="min-h-screen bg-bg text-ink p-4 pb-28 max-w-lg mx-auto flex flex-col gap-3">
       <AppHeader title="Super Admin" right={right} />
       {children}
     </div>
@@ -290,7 +291,7 @@ export default function SuperAdminPage() {
         <Button
           size="sm"
           inline
-          onClick={() => { sessionStorage.removeItem(`superadmin_${slug}`); setAuthenticated(false); }}
+          onClick={() => { sessionStorage.removeItem(`superadmin_${slug}`); notifyAuthChange(); setAuthenticated(false); }}
         >
           Sair
         </Button>

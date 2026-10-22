@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-type Tab = 'dashboard' | 'ranking' | 'partida' | 'historico';
+export type Tab = 'dashboard' | 'ranking' | 'partida' | 'historico' | 'votacao';
 
 const svg = (children: ReactNode) => (
   <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -16,6 +16,8 @@ const ICONS: Record<Tab, ReactNode> = {
   ranking: svg(<><path d="M8 4h8v5a4 4 0 0 1-8 0V4Z" /><path d="M8 6H4.5a3 3 0 0 0 3.5 4M16 6h3.5a3 3 0 0 1-3.5 4" /><path d="M12 13v4M8.5 20h7M10 17h4" /></>),
   partida: svg(<><circle cx="12" cy="12" r="8.5" /><path d="M12 3.5c-2.5 3-2.5 14 0 17M3.7 9.5c4.5 1.5 12.5 1.5 16.6 0M3.7 14.5c4.5-1.5 12.5-1.5 16.6 0" /></>),
   historico: svg(<><path d="M5 4.5h10a3 3 0 0 1 3 3V20H8a3 3 0 0 1-3-3V4.5Z" /><path d="M8 17h10M9 8.5h5M9 12h5" /></>),
+  // urna: caixa com fenda e um voto entrando
+  votacao: svg(<><path d="M4 12h16v8H4z" /><path d="M8 12v-1.5M16 12v-1.5" /><path d="M9 8.5h6" /><path d="M10 5.5h4v3h-4z" /></>),
 };
 
 const TABS: { id: Tab; label: string; path: string }[] = [
@@ -23,27 +25,45 @@ const TABS: { id: Tab; label: string; path: string }[] = [
   { id: 'ranking', label: 'Ranking', path: '/ranking' },
   { id: 'partida', label: 'Partida', path: '/game' },
   { id: 'historico', label: 'Histórico', path: '/history' },
+  { id: 'votacao', label: 'Votação', path: '/super-admin' },
 ];
 
-// Barra inferior fixa com as 4 abas (estilo "Clash Royale"). Fica no layout da liga, por isso não some na troca de tela.
+interface Props {
+  slug: string;
+  active: Tab;
+  /** A aba Votação só aparece para quem entrou com o PIN de admin. */
+  showVote?: boolean;
+  /** Chave mestra já digitada nesta sessão: o cadeado some. */
+  voteUnlocked?: boolean;
+}
+
+// Barra inferior fixa (estilo "Clash Royale"). Fica no layout da liga, por isso não some na troca de tela.
 // As páginas precisam de espaço embaixo (pb-28), por causa da barra fixa.
-export default function BottomNav({ slug, active }: { slug: string; active: Tab }) {
+export default function BottomNav({ slug, active, showVote = false, voteUnlocked = false }: Props) {
+  const tabs = showVote ? TABS : TABS.filter((t) => t.id !== 'votacao');
   return (
     <nav aria-label="Navegação principal" className="fixed bottom-0 left-0 right-0 z-[60] bg-surface border-t-[3px] border-line pb-[max(10px,env(safe-area-inset-bottom))] pt-1.5">
-      <ul className="max-w-md mx-auto grid grid-cols-4 gap-1 px-1.5">
-        {TABS.map((t) => {
+      <ul className={`max-w-md mx-auto grid gap-1 px-1.5 ${tabs.length === 5 ? 'grid-cols-5' : 'grid-cols-4'}`}>
+        {tabs.map((t) => {
           const on = active === t.id;
+          const locked = t.id === 'votacao' && !voteUnlocked;
           return (
             <li key={t.id}>
               <Link
                 href={`/g/${slug}${t.path}`}
                 aria-current={on ? 'page' : undefined}
-                className={`flex flex-col items-center justify-center gap-0.5 min-h-[54px] rounded-[14px] font-extrabold text-xs ${
+                aria-label={locked ? 'Votação, bloqueada: pede a chave mestra' : undefined}
+                className={`relative flex flex-col items-center justify-center gap-0.5 min-h-[54px] rounded-[14px] font-extrabold text-xs ${
                   on ? 'bg-sun text-sun-ink' : 'text-muted'
                 }`}
               >
-                {ICONS[t.id]}
-                {t.label}
+                <span className={`relative ${locked ? 'opacity-40' : ''}`}>
+                  {ICONS[t.id]}
+                </span>
+                {locked && (
+                  <span aria-hidden="true" className="absolute top-2 left-1/2 -translate-x-1/2 text-base leading-none drop-shadow">🔒</span>
+                )}
+                <span className={locked ? 'opacity-60' : ''}>{t.label}</span>
               </Link>
             </li>
           );

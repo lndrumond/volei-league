@@ -54,10 +54,10 @@ O "Amigos do Vôlei" é um Web App voltado para o gerenciamento de quadras/jogos
 - **Dashboard sem rodada:** "Quadra livre 😴" e o botão Iniciar rodada (admin).
 
 ## Menu da Votação
-- No Dashboard, quem entrou com o PIN de admin vê o botão "Votação (Super Admin)" com cadeado 🔒. Ao tocar, abre `/g/[slug]/super-admin`, que pede a chave mestra (senha do Super Admin). O cadeado aparece aberto 🔓 se a chave já foi digitada naquela sessão do navegador. Visitantes não veem o botão.
+- Quem entrou com o PIN de admin vê uma 5ª aba, **Votação**, na barra inferior. Ela aparece apagada, com um cadeado 🔒 no meio. Ao tocar, abre `/g/[slug]/super-admin`, que pede a chave mestra (senha do Super Admin). Depois de digitada, o cadeado some e o ícone fica normal (vale naquela sessão do navegador). Visitantes veem só as 4 abas.
 
 ## Barra Inferior (estilo Clash Royale)
-4 abas fixas no celular: **Dashboard**, **Ranking**, **Partida**, **Histórico**.
+4 abas fixas no celular: **Dashboard**, **Ranking**, **Partida**, **Histórico**. Para o admin entra a 5ª, **Votação** (ver acima).
 
 ## Ranking
 - **Mês** (UTC-3, horário de Brasília) e **Geral**, sempre completos na página de ranking.

@@ -31,7 +31,6 @@ export default function Dashboard() {
   const [lastEndedSession, setLastEndedSession] = useState<SessionRow | null>(null);
   const [sessionSets, setSessionSets] = useState<{ winner: string }[]>([]);
   const [lastSets, setLastSets] = useState<{ winner: string }[]>([]);
-  const [superUnlocked, setSuperUnlocked] = useState(false);
   const [playersMap, setPlayersMap] = useState<Record<string, string>>({});
   const [rankings, setRankings] = useState<RankingItem[]>([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -73,11 +72,6 @@ export default function Dashboard() {
   }, [slug]);
 
   useEffect(() => { loadData(); }, [loadData]);
-
-  // Cadeado aberto se este navegador já entrou como Super Admin nesta sessão.
-  useEffect(() => {
-    try { setSuperUnlocked(Boolean(sessionStorage.getItem(`superadmin_${slug}`))); } catch { setSuperUnlocked(false); }
-  }, [slug]);
 
   // Ações do admin: sem PIN abre a janela do PIN e depois segue para a rota.
   const adminGo = (route: string) => {
@@ -225,16 +219,6 @@ export default function Dashboard() {
           {rankings.length === 0 && <Sub className="text-center py-3">Nenhum ponto marcado esse mês. 🏐</Sub>}
         </div>
       </Card>
-
-      {/* Só para quem entrou com o PIN de admin: leva à votação, que pede a chave mestra */}
-      {isAdmin && (
-        <Card slim>
-          <Button onClick={() => router.push(`/g/${slug}/super-admin`)}>
-            <span aria-hidden="true">{superUnlocked ? '🔓' : '🔒'}</span> Votação (Super Admin)
-          </Button>
-          <Sub className="text-center">{superUnlocked ? 'Chave mestra já digitada nesta sessão.' : 'Pede a chave mestra para abrir.'}</Sub>
-        </Card>
-      )}
 
       {pinOpen && (
         <PinModal
