@@ -85,8 +85,9 @@ export default function Specimen() {
         <div className="grid grid-cols-2 gap-2">
           <PlayerChip name="Andrea" captain />
           <PlayerChip name="Marcelo" guest />
-          <PlayerChip name="Ti Lu" onClick={() => toast.show('Tocou em Ti Lu')} ariaLabel="Ti Lu: trocar de time" />
-          <PlayerChip name="Tia kk" captain onClick={() => toast.show('Tocou em Tia kk')} ariaLabel="Tia kk: trocar de time" />
+          <PlayerChip name="Ti Lu" side="champion" onClick={() => toast.show('Tocou em Ti Lu')} ariaLabel="Ti Lu: trocar de time" />
+          <PlayerChip name="Tia kk" side="challenger" captain onClick={() => toast.show('Tocou em Tia kk')} ariaLabel="Tia kk: trocar de time" />
+          <PlayerChip name="Rita" side="bench" onClick={() => toast.show('Tocou em Rita')} ariaLabel="Rita: colocar em um time" />
         </div>
       </Card>
 
@@ -113,8 +114,9 @@ export default function Specimen() {
 
       <Modal open={modal} onClose={() => setModal(false)} title="Ti Lu">
         <p className="text-muted">Está no Sem Colete. O que você quer fazer?</p>
-        <Button variant="vest" onClick={() => setModal(false)}>Passar para o Com Colete</Button>
-        <Button onClick={() => setModal(false)}>Mandar para o banco de areia</Button>
+        <Button variant="sea" onClick={() => setModal(false)}><span aria-hidden="true">◀ </span>Passar para o Sem Colete</Button>
+        <Button variant="vest" onClick={() => setModal(false)}>Passar para o Com Colete<span aria-hidden="true"> ▶</span></Button>
+        <Button onClick={() => setModal(false)}><span aria-hidden="true">▲ </span>Mandar para o banco de areia</Button>
         <Button size="sm" onClick={() => setModal(false)}>Voltar</Button>
       </Modal>
 

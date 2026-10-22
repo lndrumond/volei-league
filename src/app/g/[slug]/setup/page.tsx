@@ -6,6 +6,7 @@ import { apiFetch, getStoredRole } from '@/lib/avlClient';
 import { CHAMPION_NAME, CHALLENGER_NAME, teamNameWithCaptain } from '@/lib/teams';
 import { drawTeams } from '@/lib/draw';
 import { Button, Card, ConfirmModal, EmptyState, Eyebrow, Modal, PlayerChip, Sub, TeamDot, useToast } from '@/components/ui';
+import type { ChipSide } from '@/components/ui';
 import AppHeader from '@/components/AppHeader';
 
 interface PlayerRow { id: string; name: string; is_guest: boolean; is_active?: boolean; skill_rating?: number; }
@@ -301,9 +302,9 @@ export default function Setup() {
     );
   }
 
-  const teamRow = (id: string, cap: boolean) => (
+  const teamRow = (id: string, cap: boolean, side: ChipSide) => (
     <li key={id}>
-      <PlayerChip name={nameOf[id] || 'Jogador'} captain={cap} onClick={() => setSheetFor(id)} ariaLabel={`${nameOf[id]}: trocar de time ou mandar para o banco`} />
+      <PlayerChip name={nameOf[id] || 'Jogador'} captain={cap} side={side} onClick={() => setSheetFor(id)} ariaLabel={`${nameOf[id]}: trocar de time ou mandar para o banco`} />
     </li>
   );
 
@@ -382,7 +383,7 @@ export default function Setup() {
             <h2 className="text-lg font-bold">Banco de areia ({benchIds.length})</h2>
             <Sub>Quem fica de fora desta partida.</Sub>
             {benchIds.length ? (
-              <ul className="grid grid-cols-2 gap-2">{benchIds.map((id) => teamRow(id, false))}</ul>
+              <ul className="grid grid-cols-2 gap-2">{benchIds.map((id) => teamRow(id, false, 'bench'))}</ul>
             ) : (
               <p className="font-extrabold">Ninguém de fora.</p>
             )}
@@ -394,11 +395,11 @@ export default function Setup() {
             <div className="grid grid-cols-2 gap-2.5">
               <div className="min-w-0">
                 <h3 className="font-display font-bold text-[15px] mb-1.5"><TeamDot side="champion" />{CHAMPION_NAME}</h3>
-                <ul className="flex flex-col gap-1.5">{orderedWithCaptain(champIds, champCap).map((id) => teamRow(id, id === champCap))}</ul>
+                <ul className="flex flex-col gap-1.5">{orderedWithCaptain(champIds, champCap).map((id) => teamRow(id, id === champCap, 'champion'))}</ul>
               </div>
               <div className="min-w-0">
                 <h3 className="font-display font-bold text-[15px] mb-1.5"><TeamDot side="challenger" />{CHALLENGER_NAME}</h3>
-                <ul className="flex flex-col gap-1.5">{orderedWithCaptain(challIds, challCap).map((id) => teamRow(id, id === challCap))}</ul>
+                <ul className="flex flex-col gap-1.5">{orderedWithCaptain(challIds, challCap).map((id) => teamRow(id, id === challCap, 'challenger'))}</ul>
               </div>
             </div>
             <div className="flex gap-4 font-extrabold text-sm">
@@ -424,19 +425,19 @@ export default function Setup() {
             <p className="text-muted">Está {whereText}. O que você quer fazer?</p>
             {sheetSide !== 'c' && (
               <>
-                <Button variant="sea" onClick={() => moveTo(sheetFor, 'c')} disabled={champFull}>{sheetSide === 'b' ? 'Colocar no' : 'Passar para o'} {CHAMPION_NAME}</Button>
+                <Button variant="sea" onClick={() => moveTo(sheetFor, 'c')} disabled={champFull}><span aria-hidden="true">◀ </span>{sheetSide === 'b' ? 'Colocar no' : 'Passar para o'} {CHAMPION_NAME}</Button>
                 {champFull && <Sub className="text-center -mt-1">{CHAMPION_NAME} está cheio (7 jogadores).</Sub>}
               </>
             )}
             {sheetSide !== 'h' && (
               <>
-                <Button variant="vest" onClick={() => moveTo(sheetFor, 'h')} disabled={challFull}>{sheetSide === 'b' ? 'Colocar no' : 'Passar para o'} {CHALLENGER_NAME}</Button>
+                <Button variant="vest" onClick={() => moveTo(sheetFor, 'h')} disabled={challFull}>{sheetSide === 'b' ? 'Colocar no' : 'Passar para o'} {CHALLENGER_NAME}<span aria-hidden="true"> ▶</span></Button>
                 {challFull && <Sub className="text-center -mt-1">{CHALLENGER_NAME} está cheio (7 jogadores).</Sub>}
               </>
             )}
             {sheetSide !== 'b' && (
               <>
-                <Button onClick={() => moveTo(sheetFor, 'b')}>Mandar para o banco de areia</Button>
+                <Button onClick={() => moveTo(sheetFor, 'b')}><span aria-hidden="true">▲ </span>Mandar para o banco de areia</Button>
                 <Sub className="text-center -mt-1">O banco de areia é quem fica de fora desta partida.</Sub>
               </>
             )}

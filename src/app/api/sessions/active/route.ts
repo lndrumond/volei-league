@@ -20,7 +20,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Liga não encontrada' }, { status: 404 });
     }
 
-    // 1. Procura partida ATIVA
+    // 1. Partida ativa (se houver) e seus sets
     const { data: activeSession } = await supabase
       .from('sessions')
       .select('*')
@@ -28,49 +28,41 @@ export async function GET(request: Request) {
       .eq('status', 'active')
       .maybeSingle();
 
+    let activeSets: unknown[] = [];
     if (activeSession) {
       const { data: sets } = await supabase
         .from('sets')
         .select('*')
         .eq('session_id', activeSession.id)
         .order('created_at', { ascending: true });
-
-      return NextResponse.json({ 
-        session: activeSession, 
-        activeSession: activeSession, 
-        lastEndedSession: null,
-        sets: sets || [] 
-      });
+      activeSets = sets || [];
     }
 
-    // 2. Se a quadra tá livre, procura a ÚLTIMA ENCERRADA
-    const { data: lastEndedSession } = await supabase
+    // 2. Último confronto: a última partida encerrada que teve times e pelo menos um set.
+    //    Ele continua existindo enquanto há uma partida em andamento (o Dashboard mostra os dois).
+    const { data: recent } = await supabase
       .from('sessions')
-      .select('*')
+      .select('*, sets(*)')
       .eq('group_id', group.id)
       .eq('status', 'ended')
+      .not('champion_name', 'is', null)
       .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(10);
 
-    if (lastEndedSession) {
-      // 🚨 AGORA TAMBÉM BUSCAMOS OS SETS DA PARTIDA ENCERRADA PARA O PLACAR 🚨
-      const { data: lastSets } = await supabase
-        .from('sets')
-        .select('*')
-        .eq('session_id', lastEndedSession.id)
-        .order('created_at', { ascending: true });
+    const last = (recent || []).find((s: { sets?: unknown[] }) => (s.sets?.length ?? 0) > 0) || null;
+    const lastSets = last
+      ? [...(last.sets as { created_at: string }[])].sort((a, b) => (a.created_at < b.created_at ? -1 : 1))
+      : [];
+    const lastEndedSession = last ? { ...last, sets: undefined } : null;
 
-      return NextResponse.json({ 
-        session: null, 
-        activeSession: null, 
-        lastEndedSession, 
-        sets: lastSets || [] 
-      });
-    }
-
-    return NextResponse.json({ session: null, activeSession: null, lastEndedSession: null, sets: [] });
-
+    return NextResponse.json({
+      session: activeSession || null,
+      activeSession: activeSession || null,
+      lastEndedSession,
+      lastSets,
+      // `sets` mantém o formato antigo: os sets da partida ativa ou, sem ela, os do último confronto.
+      sets: activeSession ? activeSets : lastSets,
+    });
   } catch (err) {
     console.error('Erro na API:', err);
     return NextResponse.json({ error: 'Erro no servidor' }, { status: 500 });

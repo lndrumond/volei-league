@@ -48,10 +48,13 @@ O "Amigos do Vôlei" é um Web App voltado para o gerenciamento de quadras/jogos
   - *Trocar Times* e *Encerrar* ficam no topo do placar. *Desfazer último set* (admin) fica junto dos botões de set.
 - **No `/setup`:** *Abortar* (admin) encerra a sessão inteira, sem gravar nada. Para trocar de time, usar Trocar Times.
   - Nome da rodada (opcional) no topo. Presentes numa lista só, com "Selecionar todos os fixos", busca e cadastro de visitante novo. Os checkboxes vêm sempre desmarcados; só Trocar Times traz os presentes da partida anterior.
-  - "Montar times" já sorteia. Tocar num jogador abre uma janela para passar ao outro time ou mandar ao banco de areia. O banco fica no topo da lista de times.
+  - "Montar times" já sorteia. Tocar num jogador abre uma janela para passar ao outro time ou mandar ao banco de areia, com setas apontando o destino. Os jogadores têm a cor do time (azul-mar: Sem Colete; laranja: Com Colete). O banco fica no topo da lista de times.
 - **Aba "Partida" da barra inferior:** mostra placar ao vivo e escalação. Se não houver partida, mostra "Nenhuma partida no momento" e o botão Iniciar partida (admin).
-- **Card "Último confronto"** no Dashboard: a partida que acabou de terminar. Sempre aberto, com os placares lado a lado e a escalação completa, capitão marcado.
+- **Card "Último confronto"** no Dashboard: a última partida encerrada (com times e pelo menos um set). Sempre aberto, com os placares lado a lado e a escalação completa, capitão marcado. Continua no Dashboard mesmo com uma partida em andamento.
 - **Dashboard sem rodada:** "Quadra livre 😴" e o botão Iniciar rodada (admin).
+
+## Menu da Votação
+- No Dashboard, quem entrou com o PIN de admin vê o botão "Votação (Super Admin)" com cadeado 🔒. Ao tocar, abre `/g/[slug]/super-admin`, que pede a chave mestra (senha do Super Admin). O cadeado aparece aberto 🔓 se a chave já foi digitada naquela sessão do navegador. Visitantes não veem o botão.
 
 ## Barra Inferior (estilo Clash Royale)
 4 abas fixas no celular: **Dashboard**, **Ranking**, **Partida**, **Histórico**.

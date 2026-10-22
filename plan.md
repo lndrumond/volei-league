@@ -182,7 +182,8 @@ Objetivo: fixar como as telas funcionam antes de implementar. Não é o visual f
 - **Ajuste de ferramenta:** `next.config.ts` aceita `NEXT_DIST_DIR` (padrão `.next`) para eu rodar um servidor de teste em outra pasta e porta (3100), sem conflitar com o `npm run dev` do dono; `.next-test` está no `.gitignore`.
 - **Verificado:** `tsc` sem erros; lint sem erros novos (3 erros já existentes em `votes/route.ts`, `avlClient.tsx` e o `setState` em efeito do ranking); capturas de tela em celular, claro e escuro, de Dashboard, Partida (visitante), Prancheta passo 1, Histórico, Ranking, Super Admin (login e painel) e Urna.
 - **Não verificado visualmente:** o placar com botões do admin e o passo 2 da prancheta (sorteio, banco, janela de mover), porque só aparecem com uma partida ativa, e isso exige gravar no banco. Usam os mesmos componentes já vistos na vitrine `/estilo`. Ficam para o teste do dono numa rodada de verdade.
-- **Pendente da B3:** nada de código. Falta a revisão do dono.
+- **Ajustes pedidos pelo dono depois do primeiro teste (22/10/2026):** (1) na janela de mover jogador, setas apontam o destino (◀ Sem Colete, ▶ Com Colete, ▲ banco de areia); (2) na prancheta, o nome de cada jogador ganhou a cor do time (azul-mar para Sem Colete, laranja para Com Colete, neutro no banco); (3) o Último confronto fica no Dashboard também enquanto há partida em andamento (a API `/api/sessions/active` agora devolve sempre `lastEndedSession` e `lastSets`: a última partida encerrada com times e pelo menos um set; `sets` mantém o formato antigo); (4) menu "Votação (Super Admin)" no Dashboard, só para quem entrou com o PIN de admin, com cadeado 🔒 (abre 🔓 se a chave mestra já foi digitada na sessão); ao tocar, leva a `/super-admin`, que pede a chave mestra.
+- **Pendente da B3:** revisão do dono.
 - Ordem: Dashboard, Partida, Prancheta, Histórico, Ranking, Votação, Admin.
 - Prancheta é a mais complexa: **Opus 5.5**. Demais: **Sonnet 5.5**. Ajustes repetitivos de classe: **Haiku 5.5**.
 
@@ -223,6 +224,7 @@ Objetivo: fixar como as telas funcionam antes de implementar. Não é o visual f
 ---
 
 ## Histórico de alterações
+- **22/10/2026 (B3, ajustes do dono):** setas na janela de mover, jogadores coloridos pelo time na prancheta, Último confronto permanece com partida ativa (API ajustada) e menu da votação com cadeado para o admin. `tsc` sem erros; capturas conferidas (chips coloridos, setas, menu com cadeado). Partida ativa com Último confronto não foi exercitada por exigir gravar no banco. Commit local, sem deploy.
 - **22/10/2026 (B3, código):** todas as telas migradas para o sistema visual; avisos no lugar dos `alert()`; rodapé global removido; `next.config.ts` com `NEXT_DIST_DIR`. `tsc` sem erros; capturas de tela conferidas. Placar do admin e passo 2 da prancheta só serão vistos em rodada real. Commits locais, sem push e sem deploy.
 - **22/10/2026 (B2, código):** componentes do sistema visual (Button, Card, Chip, PlayerChip, Modal, ConfirmModal, Toast, EmptyState, BottomNav com SVG), vitrine `/estilo` (só dev) e `ToastProvider` no layout. Antes: erro de fonte no modo dev (`next/font/google` no Next 16) corrigido com fontes locais; paleta da B1 aprovada pelo dono. `tsc` e lint sem erros. Commits locais, sem push e sem deploy.
 - **22/10/2026 (B1, código):** tokens de tema (claro e escuro), fontes Fredoka e Nunito e utilidades do Tailwind. Telas não alteradas. `tsc` e `next build` sem erros. Dois commits locais da Fase A feitos antes (`ddff105` código e `634e168` documentos), sem push.
