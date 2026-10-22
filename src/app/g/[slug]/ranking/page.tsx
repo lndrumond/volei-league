@@ -3,6 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/avlClient';
+import { groupRanking, MEDALS } from '@/lib/ranking';
 
 interface RankingItem { name: string; points: number; is_guest?: boolean; }
 
@@ -32,7 +33,7 @@ export default function RankingPage() {
     : rankings;
 
   return (
-    <div className="h-screen bg-blue-50 flex flex-col p-4 font-sans relative overflow-hidden">
+    <div className="h-screen bg-blue-50 flex flex-col p-4 pb-20 font-sans relative overflow-hidden">
       
       {/* HEADER FIXO NO TOPO */}
       <div className="flex justify-between items-center mb-4 shrink-0">
@@ -45,7 +46,7 @@ export default function RankingPage() {
         <h1 className="text-4xl font-black text-blue-900 mb-2 text-center leading-tight">
           Ranking<br/><span className="text-blue-500">dos Atletas</span> 🏆
         </h1>
-        <p className="text-center text-blue-600 font-bold mb-4">Cada set ganho vale 1 ponto!</p>
+        <p className="text-center text-blue-600 font-bold mb-4">Cada set ganho vale 1 ponto! Empatados dividem a posição.</p>
 
         <div className="flex bg-white rounded-[1.5rem] p-1 mb-2 border-4 border-blue-200 shadow-sm">
           <button 
@@ -86,41 +87,28 @@ export default function RankingPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-3 relative z-10">
-            {filteredRankings.map((r, i) => {
-              const isFirst = i === 0;
-              const isSecond = i === 1;
-              const isThird = i === 2;
-              
-              let bgColor = 'bg-white';
-              let borderColor = 'border-blue-100';
-              let textColor = 'text-gray-800';
-              let badgeColor = 'bg-blue-100 text-blue-800';
-              
-              if (isFirst) {
-                bgColor = 'bg-yellow-400'; borderColor = 'border-yellow-500'; textColor = 'text-yellow-900'; badgeColor = 'bg-yellow-300 text-yellow-900';
-              } else if (isSecond) {
-                bgColor = 'bg-gray-300'; borderColor = 'border-gray-400'; textColor = 'text-gray-800'; badgeColor = 'bg-gray-200 text-gray-800';
-              } else if (isThird) {
-                bgColor = 'bg-orange-300'; borderColor = 'border-orange-400'; textColor = 'text-orange-900'; badgeColor = 'bg-orange-200 text-orange-900';
-              }
-
+            {groupRanking(filteredRankings).map((g) => {
+              const style =
+                g.position === 1 ? { bg: 'bg-yellow-400', border: 'border-yellow-500', text: 'text-yellow-900', badge: 'bg-yellow-300 text-yellow-900' }
+                : g.position === 2 ? { bg: 'bg-gray-300', border: 'border-gray-400', text: 'text-gray-800', badge: 'bg-gray-200 text-gray-800' }
+                : g.position === 3 ? { bg: 'bg-orange-300', border: 'border-orange-400', text: 'text-orange-900', badge: 'bg-orange-200 text-orange-900' }
+                : { bg: 'bg-white', border: 'border-blue-100', text: 'text-gray-800', badge: 'bg-blue-100 text-blue-800' };
               return (
-                <div key={i} className={`${bgColor} border-b-4 ${borderColor} p-4 rounded-[1.5rem] flex justify-between items-center shadow-sm hover:scale-[1.02] transition-transform`}>
-                  <div className="flex items-center gap-3">
-                    <span className={`font-black text-2xl w-8 text-center ${textColor}`}>
-                      {isFirst ? '🥇' : isSecond ? '🥈' : isThird ? '🥉' : `${i+1}º`}
-                    </span>
-                    <div className="flex flex-col">
-                      <span className={`font-black text-xl ${textColor} leading-none`}>{r.name}</span>
-                      {r.is_guest && <span className="text-[10px] uppercase font-black tracking-widest text-blue-500 mt-1 bg-blue-50 w-max px-2 py-0.5 rounded-md">Visitante</span>}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-1">
-                    <span className={`${badgeColor} px-4 py-2 rounded-xl font-black text-xl`}>
-                      {r.points}
-                    </span>
-                    <span className={`font-bold text-xs ${textColor} opacity-70`}>pts</span>
+                <div key={g.position} className={`${style.bg} border-b-4 ${style.border} p-4 rounded-[1.5rem] flex items-start justify-between gap-3 shadow-sm`}>
+                  <span className={`font-black text-2xl w-10 text-center shrink-0 ${style.text}`} aria-label={`${g.position}º lugar`}>
+                    {MEDALS[g.position] ?? `${g.position}º`}
+                  </span>
+                  <ul className="flex-1 min-w-0 flex flex-col gap-2">
+                    {g.players.map((p, i) => (
+                      <li key={`${p.name}-${i}`} className="min-h-8 flex items-center flex-wrap gap-2">
+                        <span className={`font-black text-xl leading-none ${style.text}`}>{p.name}</span>
+                        {p.is_guest && <span className="text-[10px] uppercase font-black tracking-widest text-blue-500 bg-blue-50 px-2 py-0.5 rounded-md">Visitante</span>}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className={`${style.badge} px-4 py-2 rounded-xl font-black text-xl`}>{g.points}</span>
+                    <span className={`font-bold text-xs ${style.text} opacity-70`}>pts</span>
                   </div>
                 </div>
               );

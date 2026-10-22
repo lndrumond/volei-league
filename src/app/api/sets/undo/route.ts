@@ -1,15 +1,25 @@
 import { NextResponse } from 'next/server';
+import { requireRole, isErrorResponse } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { fail, getSession } from '@/lib/sessions';
 
 export async function POST(request: Request) {
+  const auth = requireRole(request, 'admin');
+  if (isErrorResponse(auth)) return auth;
+
   try {
     const { session_id } = await request.json();
+
+    // Única exceção à regra de nunca apagar sets: só o último set de uma partida ainda ativa.
+    const session = await getSession(session_id);
+    if (!session) return fail('Partida não encontrada.', 404);
+    if (session.status !== 'active') return fail('Essa partida já foi encerrada.', 409);
 
     // 1. Acha o ID do ÚLTIMO set que foi jogado nessa sessão
     const { data: lastSet, error: fetchError } = await supabase
       .from('sets')
       .select('id')
-      .eq('session_id', session_id)
+      .eq('session_id', session.id)
       .order('created_at', { ascending: false })
       .limit(1)
       .single();

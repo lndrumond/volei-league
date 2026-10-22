@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
+import { requireRole, isErrorResponse } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
 export async function POST(request: Request) {
+  const auth = requireRole(request, 'admin');
+  if (isErrorResponse(auth)) return auth;
+
   try {
     // 🚨 AGORA A API RECEBE O is_guest DA TELA
     const { slug, name, is_guest } = await request.json();

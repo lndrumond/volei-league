@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { saveAuth } from '@/lib/avlClient';
 
 interface Player {
   id: string;
@@ -65,12 +66,14 @@ export default function SuperAdminPage() {
       const res = await fetch('/api/super-admin/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ slug, password }),
       });
       const data = await res.json();
       if (data.ok) {
         setAuthenticated(true);
         sessionStorage.setItem(`superadmin_${slug}`, data.token);
+        // O Super Admin também faz tudo que o admin faz neste aparelho.
+        saveAuth(slug, data.token, 'admin');
       } else {
         setAuthError(data.error || 'Senha inválida');
       }
@@ -84,11 +87,25 @@ export default function SuperAdminPage() {
     if (token) setAuthenticated(true);
   }, [slug]);
 
+  // fetch com o token do Super Admin; se o servidor recusar, volta para a tela de senha.
+  const authFetch = async (url: string, init: RequestInit = {}) => {
+    const token = sessionStorage.getItem(`superadmin_${slug}`);
+    const headers = new Headers(init.headers || {});
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    const res = await fetch(url, { ...init, headers });
+    if (res.status === 401 || res.status === 403) {
+      sessionStorage.removeItem(`superadmin_${slug}`);
+      setAuthenticated(false);
+      setAuthError('Sessão expirada. Digite a senha de novo.');
+    }
+    return res;
+  };
+
   // Carrega dados da Aba 1 (Alvos)
   const loadTargets = async () => {
     setLoadingTargets(true);
     try {
-      const res = await fetch(`/api/super-admin/targets?slug=${slug}`);
+      const res = await authFetch(`/api/super-admin/targets?slug=${slug}`);
       const data = await res.json();
       if (data.ok) {
         setAllPlayers(data.players || []);
@@ -105,7 +122,7 @@ export default function SuperAdminPage() {
   const loadPins = async () => {
     setLoadingPins(true);
     try {
-      const res = await fetch(`/api/super-admin/pins?slug=${slug}`);
+      const res = await authFetch(`/api/super-admin/pins?slug=${slug}`);
       const data = await res.json();
       if (data.ok) {
         setVoters(data.voters || []);
@@ -125,7 +142,7 @@ export default function SuperAdminPage() {
   const loadAudit = async () => {
     setLoadingAudit(true);
     try {
-      const res = await fetch(`/api/super-admin/votes?slug=${slug}`);
+      const res = await authFetch(`/api/super-admin/votes?slug=${slug}`);
       const data = await res.json();
       if (data.ok) {
         setAuditVotes(data.votes || []);
@@ -149,7 +166,7 @@ export default function SuperAdminPage() {
     setSavingTargets(true);
     setFeedbackMessage('');
     try {
-      const res = await fetch('/api/super-admin/targets', {
+      const res = await authFetch('/api/super-admin/targets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slug, target_player_ids: selectedTargetIds }),
@@ -196,7 +213,7 @@ export default function SuperAdminPage() {
     setGeneratingPins(true);
     setFeedbackMessage('');
     try {
-      const res = await fetch('/api/super-admin/pins', {
+      const res = await authFetch('/api/super-admin/pins', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slug, player_ids: selectedVoterIds }),

@@ -1,546 +1,485 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { apiFetch } from '@/lib/avlClient';
+import { useEffect, useMemo, useState } from 'react';
+import { apiFetch, getStoredRole } from '@/lib/avlClient';
+import { CHAMPION_NAME, CHALLENGER_NAME, teamNameWithCaptain } from '@/lib/teams';
+import { drawTeams } from '@/lib/draw';
 
-interface PlayerExt { id: string; name: string; is_guest?: boolean; skill_rating?: number; }
-interface SessionData { 
-  id: string; 
-  present_player_ids: string[];
-  champion_player_ids: string[];
-  challenger_player_ids: string[];
-  champion_name: string;
-  challenger_name: string;
-}
-interface RankingItem { name: string; points: number; }
+interface PlayerRow { id: string; name: string; is_guest: boolean; is_active?: boolean; skill_rating?: number; }
+type Side = 'c' | 'h' | 'b'; // c = Sem Colete, h = Com Colete, b = banco de areia
+
+const MAX_PER_TEAM = 7;
+
+const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+
+const shortDate = () =>
+  new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' });
 
 export default function Setup() {
   const { slug } = useParams() as { slug: string };
   const router = useRouter();
-  
-  const [sessionInfo, setSessionInfo] = useState<SessionData | null>(null);
-  const [allPlayers, setAllPlayers] = useState<PlayerExt[]>([]);
-  const [playersMap, setPlayersMap] = useState<Record<string, string>>({});
-  const [rankingsMap, setRankingsMap] = useState<Record<string, number>>({});
-  const [skillsMap, setSkillsMap] = useState<Record<string, number>>({});
-  
-  const [championIds, setChampionIds] = useState<string[]>([]);
-  const [challengerIds, setChallengerIds] = useState<string[]>([]);
-  const [poolIds, setPoolIds] = useState<string[]>([]); 
-  
-  const [champName, setChampName] = useState('Sem Colete');
-  const [challName, setChallName] = useState('Com Colete');
-  const [saving, setSaving] = useState(false);
 
-  const [champCaptainId, setChampCaptainId] = useState<string | null>(null);
-  const [challCaptainId, setChallCaptainId] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [players, setPlayers] = useState<PlayerRow[]>([]);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionHasTeams, setSessionHasTeams] = useState(false);
+  const [isSwap, setIsSwap] = useState(false);
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [addingLate, setAddingLate] = useState(false);
-  const [showAbortModal, setShowAbortModal] = useState(false);
+  const [step, setStep] = useState<1 | 2>(1);
+  const [desc, setDesc] = useState('');
+  const [present, setPresent] = useState<string[]>([]);
+  const [q, setQ] = useState('');
+  const [assign, setAssign] = useState<Record<string, Side>>({});
+  const [caps, setCaps] = useState<{ c: string | null; h: string | null }>({ c: null, h: null });
+  const [sheetFor, setSheetFor] = useState<string | null>(null);
 
-  // 🚨 1. CARREGAMENTO BLINDADO E URL DO RANKING CORRIGIDA 🚨
-  const loadData = async () => {
-    try {
-      const [sessRes, playRes, rankRes] = await Promise.all([
-        apiFetch(slug, `/api/sessions/active?slug=${slug}`),
-        apiFetch(slug, `/api/players/list?slug=${slug}`),
-        // AQUI ESTAVA O ERRO! Agora a URL do ranking está correta:
-        apiFetch(slug, `/api/rankings?slug=${slug}&period=month`).catch(() => null) 
-      ]);
+  const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState('');
+  const [showAbort, setShowAbort] = useState(false);
 
-      const sessData = await sessRes.json();
-      const playData = await playRes.json();
-      
-      if (sessData.error || !sessData.session) {
-        alert("Ops! Erro na quadra: " + (sessData.error || "Nenhuma rodada ativa!"));
-        router.push(`/g/${slug}`);
+  const nameOf = useMemo(() => {
+    const m: Record<string, string> = {};
+    players.forEach((p) => { m[p.id] = p.name; });
+    return m;
+  }, [players]);
+
+  const flash = (t: string) => { setToast(t); setTimeout(() => setToast(''), 2200); };
+
+  useEffect(() => {
+    const admin = getStoredRole(slug) === 'admin';
+    setIsAdmin(admin);
+    if (!admin) { setReady(true); return; }
+
+    (async () => {
+      try {
+        const [playRes, sessRes] = await Promise.all([
+          apiFetch(slug, `/api/players/list?slug=${slug}`),
+          apiFetch(slug, `/api/sessions/active?slug=${slug}`),
+        ]);
+        const playData = await playRes.json();
+        const sessData = await sessRes.json();
+        const all: PlayerRow[] = playData.players || [];
+        setPlayers(all);
+        const activeIds = new Set(all.filter((p) => p.is_active !== false).map((p) => p.id));
+
+        const s = sessData.activeSession;
+        if (s) {
+          if ((sessData.sets || []).length > 0) {
+            alert('Essa partida já tem set anotado. Para mudar os times, use Trocar Times no placar.');
+            router.replace(`/g/${slug}/game`);
+            return;
+          }
+          setSessionId(s.id);
+          setSessionHasTeams(Boolean(s.champion_name));
+          setPresent(Array.from(new Set<string>(s.present_player_ids || [])).filter((id) => activeIds.has(id)));
+          setIsSwap(String(s.description || '').startsWith('Troca de time'));
+        }
+      } catch (e) {
+        console.error(e);
+        alert('Falha de conexão com a areia! Tente novamente.');
+        router.replace(`/g/${slug}`);
         return;
       }
-      
-      const pMap: Record<string, string> = {};
-      const sMap: Record<string, number> = {};
-      if (playData.players) {
-        setAllPlayers(playData.players);
-        playData.players.forEach((p: PlayerExt) => {
-          pMap[p.id] = p.name;
-          sMap[p.id] = typeof p.skill_rating === 'number' ? p.skill_rating : 5.0;
-        });
-      }
-      setPlayersMap(pMap);
-      setSkillsMap(sMap);
+      setReady(true);
+    })();
+  }, [slug, router]);
 
-      const rMap: Record<string, number> = {};
-      if (rankRes && rankRes.ok) {
-        const rankData = await rankRes.json();
-        rankData.rankings?.forEach((r: RankingItem) => {
-          const player = playData.players?.find((p: PlayerExt) => p.name === r.name);
-          if (player) rMap[player.id] = r.points;
-        });
-      }
-      setRankingsMap(rMap);
-      
-      setSessionInfo(sessData.session);
-      
-      const currentPresent = sessData.session.present_player_ids || [];
-      const champIds = sessData.session.champion_player_ids || [];
-      const challIds = sessData.session.challenger_player_ids || [];
-      
-      setChampionIds(champIds);
-      setChallengerIds(challIds);
-      
-      if (sessData.session.champion_name) {
-        setChampName(sessData.session.champion_name.split(' (Cap:')[0].trim());
-      }
-      if (sessData.session.challenger_name) {
-        setChallName(sessData.session.challenger_name.split(' (Cap:')[0].trim());
-      }
-
-      const alreadyInTeams = [...champIds, ...challIds];
-      const onlyInPool = currentPresent.filter((id: string) => !alreadyInTeams.includes(id));
-      setPoolIds(onlyInPool);
-      
-    } catch (err) {
-      console.error(err);
-      alert("Falha de conexão com a areia! Tente novamente.");
-      router.push(`/g/${slug}`);
-    }
+  const skillOf = (id: string) => {
+    const r = players.find((p) => p.id === id)?.skill_rating;
+    return typeof r === 'number' ? r : 5;
   };
 
-  useEffect(() => { loadData(); }, [slug]); // eslint-disable-line react-hooks/exhaustive-deps
+  // ---------- passo 1: presentes ----------
+  const nq = norm(q);
+  const sorted = players.filter((p) => p.is_active !== false).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  const visible = sorted.filter((p) => (nq ? norm(p.name).includes(nq) : !p.is_guest || present.includes(p.id)));
+  const fixos = sorted.filter((p) => !p.is_guest);
+  const fixosOn = fixos.filter((p) => present.includes(p.id)).length;
+  const allFixos = fixos.length > 0 && fixosOn === fixos.length;
+  const autoName = `${isSwap ? 'Troca de time' : 'Rodada'} · ${shortDate()}`;
 
-  useEffect(() => {
-    if (championIds.length > 0 && (!champCaptainId || !championIds.includes(champCaptainId))) {
-      setChampCaptainId(championIds[0]);
-    } else if (championIds.length === 0) {
-      setChampCaptainId(null);
-    }
-  }, [championIds, champCaptainId]);
-
-  useEffect(() => {
-    if (challengerIds.length > 0 && (!challCaptainId || !challengerIds.includes(challCaptainId))) {
-      setChallCaptainId(challengerIds[0]);
-    } else if (challengerIds.length === 0) {
-      setChallCaptainId(null);
-    }
-  }, [challengerIds, challCaptainId]);
-
-  const handleAddLatecomer = async (existingId?: string, newName?: string, isGuest: boolean = true) => {
-    setAddingLate(true);
-    let idToAdd = existingId;
-
-    try {
-      if (newName && newName.trim() !== '') {
-        const res = await apiFetch(slug, '/api/players/add', {
-          method: 'POST',
-          body: JSON.stringify({ slug, name: newName.trim(), is_guest: isGuest })
-        });
-        const data = await res.json();
-        if(data.error) throw new Error(data.error);
-        idToAdd = data.player.id;
-        setPlayersMap(prev => ({ ...prev, [idToAdd as string]: data.player.name }));
-        setAllPlayers(prev => [...prev, data.player]);
-      }
-
-      if (!idToAdd) return;
-
-      const newPool = [...poolIds, idToAdd];
-      setPoolIds(newPool);
-
-      const allPresentNow = [...championIds, ...challengerIds, ...newPool];
-      if (sessionInfo) {
-        await apiFetch(slug, '/api/sessions/update-presence', {
-          method: 'POST',
-          body: JSON.stringify({ session_id: sessionInfo.id, present_player_ids: allPresentNow })
-        });
-      }
-
-      setSearchTerm('');
-      setShowDropdown(false);
-    } catch (e) {
-      alert("Erro ao botar o pereba no jogo.");
-    } finally {
-      setAddingLate(false);
-    }
+  const togglePresent = (id: string) => {
+    setPresent((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setQ('');
   };
 
-  const handleToggleGuestStatus = async (e: React.MouseEvent, playerId: string, makeGuest: boolean) => {
-    e.stopPropagation();
+  const toggleAllFixos = () => {
+    const ids = fixos.map((p) => p.id);
+    setPresent((prev) => (allFixos ? prev.filter((id) => !ids.includes(id)) : Array.from(new Set([...prev, ...ids]))));
+  };
+
+  const setGuest = async (p: PlayerRow, makeGuest: boolean) => {
+    if (p.is_guest === makeGuest) return;
     try {
       const res = await apiFetch(slug, '/api/players/update', {
         method: 'PUT',
-        body: JSON.stringify({ player_id: playerId, is_guest: makeGuest })
+        body: JSON.stringify({ player_id: p.id, is_guest: makeGuest }),
+      });
+      if (!res.ok) throw new Error();
+      setPlayers((prev) => prev.map((x) => (x.id === p.id ? { ...x, is_guest: makeGuest } : x)));
+      flash(`${p.name} agora é ${makeGuest ? 'visitante' : 'fixo'}`);
+    } catch {
+      alert('Erro ao mudar o status.');
+    }
+  };
+
+  const addGuest = async () => {
+    const name = q.trim();
+    if (!name) return;
+    setBusy(true);
+    try {
+      const res = await apiFetch(slug, '/api/players/add', {
+        method: 'POST',
+        body: JSON.stringify({ slug, name, is_guest: true }),
       });
       const data = await res.json();
-      if (data.ok) {
-        setAllPlayers(prev => prev.map(p => p.id === playerId ? { ...p, is_guest: makeGuest } : p));
-      } else {
-        alert('Erro ao mudar o status.');
-      }
-    } catch (err) {
-      alert('Erro de conexão ao mudar status.');
+      if (!res.ok || !data.player) throw new Error(data.error);
+      setPlayers((prev) => [...prev, data.player]);
+      setPresent((prev) => [...prev, data.player.id]);
+      setQ('');
+      flash(`${data.player.name} cadastrado como visitante`);
+    } catch {
+      alert('Erro ao adicionar o visitante.');
+    } finally {
+      setBusy(false);
     }
   };
 
-  const handleRemoveFromSession = async (idToRemove: string) => {
-    const newPool = poolIds.filter(id => id !== idToRemove);
-    setPoolIds(newPool);
-    const allPresentNow = [...championIds, ...challengerIds, ...newPool];
-    try {
-      if (sessionInfo) {
-        await apiFetch(slug, '/api/sessions/update-presence', {
-          method: 'POST',
-          body: JSON.stringify({ session_id: sessionInfo.id, present_player_ids: allPresentNow })
-        });
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const movePlayer = (id: string, from: 'pool'|'champ'|'chall', to: 'pool'|'champ'|'chall') => {
-    const removers = {
-      pool: () => setPoolIds(prev => prev.filter(x => x !== id)),
-      champ: () => setChampionIds(prev => prev.filter(x => x !== id)),
-      chall: () => setChallengerIds(prev => prev.filter(x => x !== id))
-    };
-    const adders = {
-      pool: () => setPoolIds(prev => [...prev, id]),
-      champ: () => setChampionIds(prev => [...prev, id]),
-      chall: () => setChallengerIds(prev => [...prev, id])
-    };
-    removers[from]();
-    adders[to]();
-  };
-
-  // 🚨 CHAVE PARA EXIBIR/OCULTAR LOGS DE RATING NO CONSOLE DO NAVEGADOR
-  const DEBUG_SHOW_RATINGS = true;
-
-  // Função auxiliar para gerar combinações de k elementos a partir de um array
-  const getKCombinations = <T,>(arr: T[], k: number): T[][] => {
-    if (k === 0) return [[]];
-    if (arr.length === 0) return [];
-    const head = arr[0];
-    const tail = arr.slice(1);
-    const withHead = getKCombinations(tail, k - 1).map(c => [head, ...c]);
-    const withoutHead = getKCombinations(tail, k);
-    return [...withHead, ...withoutHead];
-  };
-
-  // 🚨 2. A MATEMÁTICA PERFEITA (ALGORITMO COMBINATÓRIO VARIÁVEL & BALANCEADO) 🚨
-  const handleBalancedRandomize = () => {
-    const allPresent = [...poolIds, ...championIds, ...challengerIds];
-    if (allPresent.length < 4) return alert('Tem pouca gente pra sortear!');
-
-    // Embaralha inicialmente para diversificar caso haja mais de 12 jogadores
-    const shuffled = [...allPresent].sort(() => Math.random() - 0.5);
-    
-    let playing: string[] = [];
-    let bench: string[] = [];
-
-    if (shuffled.length <= 12) {
-      playing = shuffled;
-    } else {
-      playing = shuffled.slice(0, 12);
-      bench = shuffled.slice(12);
-    }
-
-    const getSkill = (id: string) => skillsMap[id] ?? 5.0;
-    const teamASize = Math.floor(playing.length / 2);
-
-    // 1. Gera todas as combinações de escolha para o Time A
-    const allACombos = getKCombinations(playing, teamASize);
-
-    // 2. Avalia cada combinação calculando a soma e a diferença
-    interface Candidate {
-      teamA: string[];
-      teamB: string[];
-      sumA: number;
-      sumB: number;
-      diff: number;
-    }
-
-    const candidates: Candidate[] = allACombos.map(teamA => {
-      const teamB = playing.filter(id => !teamA.includes(id));
-      const sumA = teamA.reduce((acc, id) => acc + getSkill(id), 0);
-      const sumB = teamB.reduce((acc, id) => acc + getSkill(id), 0);
-      return {
-        teamA,
-        teamB,
-        sumA,
-        sumB,
-        diff: Math.abs(sumA - sumB),
-      };
+  const runDraw = (ids: string[]) => {
+    const r = drawTeams(ids, skillOf);
+    const next: Record<string, Side> = {};
+    r.champion.forEach((id) => { next[id] = 'c'; });
+    r.challenger.forEach((id) => { next[id] = 'h'; });
+    r.bench.forEach((id) => { next[id] = 'b'; });
+    setAssign(next);
+    setCaps({
+      c: r.champion[Math.floor(Math.random() * r.champion.length)] ?? null,
+      h: r.challenger[Math.floor(Math.random() * r.challenger.length)] ?? null,
     });
+    setSheetFor(null);
+  };
 
-    // 3. Encontra a menor diferença absoluta possível entre todas as formações
-    const minDiff = Math.min(...candidates.map(c => c.diff));
-
-    // 4. Seleciona o grupo dos melhores encaixes (diferença idêntica ou dentro de 0.5 de tolerância)
-    const bestCandidates = candidates.filter(c => c.diff <= minDiff + 0.5);
-
-    // 5. Escolhe UMA combinação aleatória dentro das melhores opções
-    const chosen = bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
-
-    // 6. Moeda da Sorte (Sorteia quem assume Colete x Sem Colete)
-    const coinFlip = Math.random() > 0.5;
-    const finalChamp = coinFlip ? chosen.teamB : chosen.teamA;
-    const finalChall = coinFlip ? chosen.teamA : chosen.teamB;
-
-    setChampionIds(finalChamp);
-    setChallengerIds(finalChall);
-    setPoolIds(bench);
-
-    // 📊 LOGS DE AUDITORIA (Exibidos apenas se DEBUG_SHOW_RATINGS = true)
-    if (DEBUG_SHOW_RATINGS) {
-      console.log("==================================================");
-      console.log("🎲 [SORTEIO BALANCEADO COMBINATÓRIO & VARIÁVEL]");
-      console.log("==================================================");
-      console.log(`💡 Total de formações possíveis avaliadas: ${candidates.length}`);
-      console.log(`🌟 Formações no grupo ótimo (diff <= ${(minDiff + 0.5).toFixed(2)} pts): ${bestCandidates.length}`);
-      console.log("--------------------------------------------------");
-      console.log("📋 Jogadores na partida:");
-      playing.forEach(id => {
-        console.log(`   • ${playersMap[id] || id}: ${getSkill(id).toFixed(2)} pts`);
-      });
-      console.log("--------------------------------------------------");
-      console.log(`🟢 TIME A (${chosen.teamA.length} jog.):`, chosen.teamA.map(id => `${playersMap[id]} (${getSkill(id).toFixed(1)})`).join(', '));
-      console.log(`   👉 Soma: ${chosen.sumA.toFixed(2)} pts | Média: ${(chosen.sumA / chosen.teamA.length).toFixed(2)} pts`);
-      console.log("--------------------------------------------------");
-      console.log(`🔴 TIME B (${chosen.teamB.length} jog.):`, chosen.teamB.map(id => `${playersMap[id]} (${getSkill(id).toFixed(1)})`).join(', '));
-      console.log(`   👉 Soma: ${chosen.sumB.toFixed(2)} pts | Média: ${(chosen.sumB / chosen.teamB.length).toFixed(2)} pts`);
-      console.log("--------------------------------------------------");
-      console.log(`⚖️ Diferença de habilidade: ${chosen.diff.toFixed(2)} pts (Mínima possível: ${minDiff.toFixed(2)} pts)`);
-      console.log(`🪙 Inversão de Cores (Coin Flip): ${coinFlip ? "Sim 🔄" : "Não ➡️"}`);
-      if (bench.length > 0) {
-        console.log(`🛋️ Banco de Areia (${bench.length}):`, bench.map(id => `${playersMap[id]} (${getSkill(id).toFixed(1)})`).join(', '));
+  const goToTeams = async () => {
+    if (present.length < 2) return;
+    setBusy(true);
+    try {
+      let res: Response;
+      if (!sessionId) {
+        res = await apiFetch(slug, '/api/sessions/start', {
+          method: 'POST',
+          body: JSON.stringify({ slug, present_player_ids: present, description: desc.trim() || undefined }),
+        });
+      } else if (!sessionHasTeams) {
+        res = await apiFetch(slug, '/api/sessions/update-presence', {
+          method: 'POST',
+          body: JSON.stringify({ session_id: sessionId, present_player_ids: present }),
+        });
+      } else {
+        res = new Response('{}', { status: 200 }); // times já gravados: os presentes vão junto no fim
       }
-      console.log("==================================================");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || 'Erro ao salvar os presentes.');
+        return;
+      }
+      if (data.session?.id) setSessionId(data.session.id);
+      runDraw(present);
+      setStep(2);
+    } catch {
+      alert('Erro ao salvar os presentes.');
+    } finally {
+      setBusy(false);
     }
   };
 
-  const executeAbort = async () => {
-    if (!sessionInfo) return;
-    try {
-      await apiFetch(slug, '/api/sessions/end', {
-        method: 'POST',
-        body: JSON.stringify({ session_id: sessionInfo.id })
-      });
-      router.push(`/g/${slug}`);
-    } catch (e) {
-      alert("Erro ao fechar a quadra.");
+  // ---------- passo 2: times ----------
+  const inSide = (k: Side) => present.filter((id) => assign[id] === k);
+  const champIds = inSide('c');
+  const challIds = inSide('h');
+  const benchIds = inSide('b');
+
+  // O capitão é sempre alguém do time; se saiu, sorteia outro.
+  const capOf = (k: 'c' | 'h', list: string[]) => {
+    const cur = caps[k];
+    return cur && list.includes(cur) ? cur : list.length ? list[0] : null;
+  };
+  const champCap = capOf('c', champIds);
+  const challCap = capOf('h', challIds);
+
+  const orderedWithCaptain = (list: string[], cap: string | null) =>
+    cap ? [cap, ...list.filter((id) => id !== cap)] : list;
+
+  const moveTo = (id: string, to: Side) => {
+    if ((to === 'c' && champIds.length >= MAX_PER_TEAM) || (to === 'h' && challIds.length >= MAX_PER_TEAM)) {
+      flash('Time cheio: no máximo 7 jogadores');
+      return;
     }
+    setAssign((prev) => ({ ...prev, [id]: to }));
+    setSheetFor(null);
   };
 
-  const handleSave = async () => {
-    if (!champName.trim() || !challName.trim()) return alert('Dá um nome pros times!');
-    if (championIds.length === 0 || challengerIds.length === 0) return alert('Times vazios!');
-    if (!sessionInfo) return;
-    
-    setSaving(true);
+  const startMatch = async () => {
+    if (!sessionId || champIds.length === 0 || challIds.length === 0) return;
+    setBusy(true);
     try {
-      const finalChampName = champCaptainId ? `${champName.trim()} (Cap: ${playersMap[champCaptainId].split(' ')[0]})` : champName.trim();
-      const finalChallName = challCaptainId ? `${challName.trim()} (Cap: ${playersMap[challCaptainId].split(' ')[0]})` : challName.trim();
-
-      const allPresentNow = [...championIds, ...challengerIds, ...poolIds];
-      await apiFetch(slug, '/api/sessions/setup-teams', {
+      const res = await apiFetch(slug, '/api/sessions/setup-teams', {
         method: 'POST',
         body: JSON.stringify({
-          session_id: sessionInfo.id,
-          champion_name: finalChampName,
-          challenger_name: finalChallName,
-          champion_player_ids: championIds,
-          challenger_player_ids: challengerIds,
-        })
+          session_id: sessionId,
+          champion_name: teamNameWithCaptain(CHAMPION_NAME, champCap ? nameOf[champCap] : null),
+          challenger_name: teamNameWithCaptain(CHALLENGER_NAME, challCap ? nameOf[challCap] : null),
+          champion_player_ids: champIds,
+          challenger_player_ids: challIds,
+          present_player_ids: present,
+          description: desc.trim() || undefined,
+        }),
       });
-      await apiFetch(slug, '/api/sessions/update-presence', {
-        method: 'POST',
-        body: JSON.stringify({ session_id: sessionInfo.id, present_player_ids: allPresentNow })
-      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || 'Deu ruim ao salvar os times!');
+        return;
+      }
       router.push(`/g/${slug}/game`);
-    } catch (e) {
+    } catch {
       alert('Deu ruim ao salvar os times!');
-      setSaving(false);
+    } finally {
+      setBusy(false);
     }
   };
 
-  // Se der tela branca, isso aqui segura a onda bonitinho:
-  if (!sessionInfo) return (
-    <div className="min-h-screen bg-green-50 flex flex-col items-center justify-center p-4 text-center">
-      <h2 className="text-green-800 font-black text-3xl animate-pulse mb-6">Pintando as linhas da quadra...</h2>
-      <span className="text-6xl animate-bounce">🏐</span>
-    </div>
-  );
+  const abort = async () => {
+    setBusy(true);
+    try {
+      if (sessionId) {
+        const res = await apiFetch(slug, '/api/sessions/end', { method: 'POST', body: JSON.stringify({ session_id: sessionId }) });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          alert(data.error || 'Erro ao fechar a quadra.');
+          setBusy(false);
+          return;
+        }
+      }
+      router.push(`/g/${slug}`);
+    } catch {
+      alert('Erro ao fechar a quadra.');
+      setBusy(false);
+    }
+  };
 
-  const poolTitle = poolIds.length >= 5 ? `Time de Fora / Próximos (${poolIds.length})` : `Banco de Areia (${poolIds.length})`;
-  
-  const allPresent = [...poolIds, ...championIds, ...challengerIds];
-  const absentPlayers = allPlayers.filter(p => !allPresent.includes(p.id));
-  const normalizedSearch = searchTerm.toLowerCase();
-  const filteredAbsent = absentPlayers.filter(p => p.name.toLowerCase().includes(normalizedSearch));
-  const exactMatchExists = filteredAbsent.some(p => p.name.toLowerCase() === normalizedSearch);
-  const filteredFixos = filteredAbsent.filter(p => !p.is_guest);
-  const filteredGuests = filteredAbsent.filter(p => p.is_guest);
-
-  return (
-    <div className="min-h-screen bg-orange-50 p-4 pb-20 max-w-md mx-auto font-sans relative">
-      <div className="flex justify-between items-center mb-6">
-        <button onClick={() => router.push(`/g/${slug}`)} className="text-orange-800 font-black flex items-center gap-2 transition-colors hover:text-orange-600">
-          <span>◀</span> Sair
-        </button>
-        <button onClick={() => setShowAbortModal(true)} className="text-red-500 bg-red-100 px-3 py-2 rounded-xl font-black text-sm border-b-4 border-red-200 active:translate-y-1 transition-all shadow-sm">
-          🛑 Abortar Rodada
-        </button>
+  // ---------- telas ----------
+  if (!ready) {
+    return (
+      <div className="min-h-screen bg-orange-50 flex flex-col items-center justify-center p-4 text-center">
+        <h2 className="text-orange-800 font-black text-3xl animate-pulse mb-6">Pintando as linhas da quadra...</h2>
+        <span className="text-6xl animate-bounce">🏐</span>
       </div>
-      <h1 className="text-3xl font-black text-orange-900 mb-6 text-center leading-tight">
-        Tirando os<br/><span className="text-orange-500">Times</span> 🤼
-      </h1>
+    );
+  }
 
-      <div className="bg-white p-5 rounded-[2rem] mb-6 shadow-sm border-b-8 border-orange-200 relative z-40">
-        <h3 className="font-black text-orange-800 mb-3 flex items-center gap-2">⏱️ Chegou atrasado?</h3>
-        <div className="relative">
-          <input 
-            type="text" 
-            placeholder="Buscar nome ou digitar novo..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onFocus={() => setShowDropdown(true)}
-            className="w-full bg-gray-50 border-4 border-gray-100 rounded-2xl p-4 font-black text-gray-700 outline-none focus:border-orange-500 focus:bg-white transition-all shadow-inner"
-            disabled={addingLate}
-          />
-          {addingLate && <span className="absolute right-4 top-4 text-orange-500 animate-spin">⏳</span>}
-
-          {showDropdown && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} />
-              <div className="absolute top-full left-0 right-0 mt-2 bg-white border-4 border-orange-200 rounded-[1.5rem] shadow-xl overflow-hidden z-50 max-h-72 overflow-y-auto animate-in fade-in duration-200">
-                
-                {filteredFixos.length > 0 && (
-                  <div className="p-2">
-                    <div className="text-xs font-black text-gray-400 uppercase tracking-widest px-3 py-1">A Galera (Fixos)</div>
-                    {filteredFixos.map(p => (
-                      <div key={p.id} className="flex items-center bg-green-50 hover:bg-green-100 rounded-xl mb-1 px-1 transition-colors">
-                        <button onClick={() => handleAddLatecomer(p.id)} className="flex-1 text-left font-black text-green-900 p-3 active:scale-95 transition-transform">
-                          {p.name}
-                        </button>
-                        <button onClick={(e) => handleToggleGuestStatus(e, p.id, true)} className="p-2 text-xl hover:scale-110 transition-transform grayscale opacity-30 hover:grayscale-0 hover:opacity-100" title="Tornar Visitante">
-                          🧳
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {filteredGuests.length > 0 && (
-                  <div className="p-2 border-t-2 border-gray-50">
-                    <div className="text-xs font-black text-gray-400 uppercase tracking-widest px-3 py-1">Visitantes Antigos</div>
-                    {filteredGuests.map(p => (
-                      <div key={p.id} className="flex items-center bg-orange-50 hover:bg-orange-100 rounded-xl mb-1 px-1 transition-colors">
-                        <button onClick={() => handleAddLatecomer(p.id)} className="flex-1 text-left font-black text-orange-900 p-3 active:scale-95 transition-transform">
-                          {p.name}
-                        </button>
-                        <button onClick={(e) => handleToggleGuestStatus(e, p.id, false)} className="p-2 text-xl hover:scale-110 transition-transform drop-shadow-sm" title="Promover a Fixo">
-                          ⭐
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                
-                {searchTerm.trim() !== '' && !exactMatchExists && (
-                  <div className="p-3 border-t-4 border-orange-100 bg-orange-50 flex gap-2">
-                    <button onClick={() => handleAddLatecomer(undefined, searchTerm, false)} className="flex-1 flex flex-col items-center justify-center text-center font-black text-white bg-green-500 hover:bg-green-600 p-3 rounded-xl active:scale-95 transition-transform shadow-sm">
-                      <span className="text-xs uppercase opacity-80 mb-1">Adicionar</span>
-                      <span>Fixo 🤝</span>
-                    </button>
-                    <button onClick={() => handleAddLatecomer(undefined, searchTerm, true)} className="flex-1 flex flex-col items-center justify-center text-center font-black text-white bg-orange-500 hover:bg-orange-600 p-3 rounded-xl active:scale-95 transition-transform shadow-sm">
-                      <span className="text-xs uppercase opacity-80 mb-1">Adicionar</span>
-                      <span>Visitante 🧳</span>
-                    </button>
-                  </div>
-                )}
-
-                {filteredAbsent.length === 0 && searchTerm.trim() === '' && (
-                  <div className="p-6 text-center text-gray-400 font-bold">Todo mundo já tá na quadra! 🙌</div>
-                )}
-              </div>
-            </>
-          )}
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-orange-50 p-4 flex items-center justify-center">
+        <div className="bg-white rounded-[2rem] p-8 text-center shadow-sm border-b-8 border-orange-200 max-w-sm">
+          <div className="text-6xl mb-2" aria-hidden="true">🔒</div>
+          <h1 className="text-2xl font-black text-orange-900">Só para o admin</h1>
+          <p className="text-gray-500 font-bold mt-2">A prancheta de times é do admin. Você acompanha o jogo pelas outras abas.</p>
+          <button onClick={() => router.push(`/g/${slug}`)} className="mt-5 w-full bg-orange-500 text-white text-lg font-black py-3 rounded-2xl border-b-4 border-orange-700">Voltar</button>
         </div>
       </div>
+    );
+  }
 
-      <button onClick={handleBalancedRandomize} className="w-full bg-blue-500 text-white text-xl font-black py-5 rounded-[1.5rem] border-b-8 border-blue-700 active:border-b-0 active:translate-y-2 transition-all shadow-md mb-6 flex justify-center items-center gap-2">
-        ⚖️ SORTEIO BALANCEADO
+  const row = (id: string, cap: boolean, label?: string) => (
+    <li key={id}>
+      <button
+        onClick={() => setSheetFor(id)}
+        aria-label={`${nameOf[id]}: trocar de time ou mandar para o banco`}
+        className="w-full flex items-center justify-between gap-2 py-3 px-2 min-h-12 font-bold text-gray-800 text-left border-b border-gray-100"
+      >
+        <span>{nameOf[id]}{cap && <span className="ml-1 text-[10px] font-black text-orange-500 uppercase">cap.</span>}{label}</span>
+        <span aria-hidden="true" className="text-gray-400">⇄</span>
       </button>
+    </li>
+  );
 
-      {poolIds.length > 0 && (
-        <div className="bg-white p-5 rounded-[2rem] mb-6 border-4 border-orange-200 shadow-sm relative z-10">
-          <h3 className="font-black text-gray-400 mb-3 text-lg">{poolTitle}</h3>
-          <div className="flex flex-wrap gap-3">
-            {poolIds.map(id => (
-              <div key={id} className="bg-gray-100 pl-4 pr-2 py-2 rounded-2xl flex items-center gap-2 shadow-sm border-2 border-gray-200 hover:bg-gray-50 transition-colors">
-                <span className="font-black text-gray-800 text-lg whitespace-nowrap">{playersMap[id] || 'Pereba'}</span>
-                <div className="flex gap-1 ml-1">
-                  <button onClick={() => movePlayer(id, 'pool', 'champ')} className="bg-green-100 text-green-600 px-3 py-1 rounded-xl font-black text-xl active:scale-95 transition-transform">◀</button>
-                  <button onClick={() => movePlayer(id, 'pool', 'chall')} className="bg-red-100 text-red-600 px-3 py-1 rounded-xl font-black text-xl active:scale-95 transition-transform">▶</button>
-                  <button onClick={() => handleRemoveFromSession(id)} className="bg-gray-200 text-gray-500 hover:bg-red-200 hover:text-red-600 px-2 py-1 rounded-lg font-black text-lg active:scale-95 transition-colors ml-1 shadow-sm" title="Mandar pro chuveiro">🗑️</button>
-                </div>
+  const sheetSide = sheetFor ? assign[sheetFor] : null;
+  const whereText = sheetSide === 'c' ? 'no Sem Colete' : sheetSide === 'h' ? 'no Com Colete' : 'no banco de areia';
+
+  return (
+    <div className="min-h-screen bg-orange-50 p-4 pb-24 max-w-md mx-auto font-sans relative flex flex-col gap-4">
+      <div className="flex justify-between items-center">
+        <button onClick={() => router.push(`/g/${slug}`)} className="text-orange-800 font-black flex items-center gap-2 py-2">
+          <span>◀</span> Sair
+        </button>
+        <button onClick={() => setShowAbort(true)} className="text-red-500 bg-red-100 px-3 py-2 rounded-xl font-black text-sm border-b-4 border-red-200 active:translate-y-1 transition-all">
+          🛑 Abortar
+        </button>
+      </div>
+
+      <h1 className="text-3xl font-black text-orange-900 text-center leading-tight">
+        Tirando os <span className="text-orange-500">Times</span> 🤼
+      </h1>
+
+      {isSwap && step === 1 && (
+        <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-3 text-blue-900 font-bold text-sm">
+          <b>Trocar Times.</b> A partida anterior já foi encerrada com os sets ganhos. Ajuste os presentes e monte os times de novo.
+        </div>
+      )}
+
+      {step === 1 && (
+        <>
+          <div className="bg-white p-5 rounded-[2rem] shadow-sm border-b-8 border-orange-200">
+            <label htmlFor="desc" className="font-black text-orange-800 text-sm">Nome da rodada (opcional)</label>
+            <input
+              id="desc" type="text" value={desc} onChange={(e) => setDesc(e.target.value)} maxLength={80}
+              placeholder={autoName} autoComplete="off"
+              className="mt-2 w-full bg-gray-50 border-4 border-gray-100 rounded-2xl p-3 font-bold text-gray-700 outline-none focus:border-orange-500"
+            />
+            <p className="text-gray-500 font-bold text-xs mt-2">Em branco, usamos “{autoName}”.</p>
+          </div>
+
+          <div className="bg-white p-5 rounded-[2rem] shadow-sm border-b-8 border-orange-200">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-black text-orange-800 text-lg">Quem está na areia?</h2>
+              <span className="bg-orange-100 text-orange-700 font-black text-sm px-3 py-1 rounded-full">
+                {present.length} {present.length === 1 ? 'presente' : 'presentes'}
+              </span>
+            </div>
+            <input
+              type="search" value={q} onChange={(e) => setQ(e.target.value)} autoComplete="off"
+              placeholder="Buscar jogador pelo nome" aria-label="Buscar jogador pelo nome"
+              className="w-full bg-gray-50 border-4 border-gray-100 rounded-2xl p-3 font-bold text-gray-700 outline-none focus:border-orange-500 mb-2"
+            />
+
+            {!nq && fixos.length > 0 && (
+              <button onClick={toggleAllFixos} aria-pressed={allFixos} className="w-full flex items-center gap-3 py-3 px-2 min-h-12 font-black text-gray-800 border-b border-gray-100 text-left">
+                <span className={`w-7 h-7 rounded-lg border-4 flex items-center justify-center text-sm ${allFixos ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300'}`} aria-hidden="true">
+                  {allFixos ? '✓' : fixosOn ? '–' : ''}
+                </span>
+                Selecionar todos os fixos
+              </button>
+            )}
+
+            <ul>
+              {visible.map((p) => {
+                const on = present.includes(p.id);
+                return (
+                  <li key={p.id} className="flex items-center gap-2 border-b border-gray-100">
+                    <button onClick={() => togglePresent(p.id)} aria-pressed={on} className="flex-1 flex items-center gap-3 py-3 px-2 min-h-12 font-bold text-gray-800 text-left">
+                      <span className={`w-7 h-7 rounded-lg border-4 flex items-center justify-center text-sm shrink-0 ${on ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300'}`} aria-hidden="true">{on ? '✓' : ''}</span>
+                      {p.name}
+                    </button>
+                    <div role="group" aria-label={`Cadastro de ${p.name}`} className="flex rounded-xl overflow-hidden border-2 border-gray-200 text-xs font-black shrink-0">
+                      <button onClick={() => setGuest(p, false)} aria-pressed={!p.is_guest} className={`px-2 py-2 ${!p.is_guest ? 'bg-green-500 text-white' : 'bg-white text-gray-500'}`}>Fixo</button>
+                      <button onClick={() => setGuest(p, true)} aria-pressed={p.is_guest} className={`px-2 py-2 ${p.is_guest ? 'bg-orange-500 text-white' : 'bg-white text-gray-500'}`}>Visitante</button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {visible.length === 0 && nq && <p className="text-gray-500 font-bold text-sm mt-2">Ninguém com esse nome no cadastro.</p>}
+            {nq && !sorted.some((p) => norm(p.name) === nq) && (
+              <button onClick={addGuest} disabled={busy} className="mt-3 w-full bg-yellow-300 text-yellow-900 font-black py-3 rounded-2xl border-b-4 border-yellow-500 active:translate-y-1 active:border-b-0 disabled:opacity-50">
+                + Adicionar “{q.trim()}” como visitante
+              </button>
+            )}
+            {!nq && <p className="text-gray-500 font-bold text-xs mt-3">Visitante? Digite o nome na busca.</p>}
+          </div>
+
+          <button onClick={goToTeams} disabled={present.length < 2 || busy} className="w-full bg-yellow-400 text-yellow-900 text-2xl font-black py-5 rounded-2xl border-b-8 border-yellow-600 active:border-b-0 active:translate-y-2 transition-all disabled:opacity-50">
+            {busy ? 'Salvando...' : 'Montar times'}
+          </button>
+        </>
+      )}
+
+      {step === 2 && (
+        <>
+          <div className="bg-white p-5 rounded-[2rem] shadow-sm border-b-8 border-orange-200">
+            <h2 className="font-black text-orange-800 text-lg">Banco de areia ({benchIds.length})</h2>
+            <p className="text-gray-500 font-bold text-sm">Quem fica de fora desta partida.</p>
+            {benchIds.length ? <ul className="mt-2">{benchIds.map((id) => row(id, false))}</ul> : <p className="font-black text-gray-700 mt-2">Ninguém de fora.</p>}
+          </div>
+
+          <div className="bg-white p-5 rounded-[2rem] shadow-sm border-b-8 border-orange-200">
+            <h2 className="font-black text-orange-800 text-lg">Times sorteados</h2>
+            <p className="text-gray-500 font-bold text-sm">Toque no nome de um jogador para trocar de time ou mandar para o banco.</p>
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <div>
+                <h3 className="font-black text-green-700">{CHAMPION_NAME}</h3>
+                <ul>{orderedWithCaptain(champIds, champCap).map((id) => row(id, id === champCap))}</ul>
               </div>
-            ))}
+              <div>
+                <h3 className="font-black text-orange-600">{CHALLENGER_NAME}</h3>
+                <ul>{orderedWithCaptain(challIds, challCap).map((id) => row(id, id === challCap))}</ul>
+              </div>
+            </div>
+            <div className="flex gap-4 mt-3 font-black text-sm text-gray-700">
+              <span>{CHAMPION_NAME} {champIds.length}</span>
+              <span>{CHALLENGER_NAME} {challIds.length}</span>
+            </div>
+            <p className="text-gray-500 font-bold text-xs mt-2">O sorteio coloca até 6 por time. À mão cabem até 7.</p>
+            <button onClick={() => runDraw(present)} className="mt-3 w-full bg-gray-100 text-gray-700 font-black py-3 rounded-2xl border-b-4 border-gray-300 active:translate-y-1 active:border-b-0">
+              Sortear de novo
+            </button>
+          </div>
+
+          <button onClick={startMatch} disabled={busy || champIds.length === 0 || challIds.length === 0} className="w-full bg-yellow-400 text-yellow-900 text-2xl font-black py-5 rounded-2xl border-b-8 border-yellow-600 active:border-b-0 active:translate-y-2 transition-all disabled:opacity-50">
+            {busy ? 'Salvando...' : 'BOLA PRO ALTO!'}
+          </button>
+          <button onClick={() => setStep(1)} className="w-full text-orange-800 font-black py-2">Voltar aos presentes</button>
+        </>
+      )}
+
+      <p className="text-gray-500 font-bold text-xs text-center">Abortar encerra a rodada toda, sem gravar nada.</p>
+
+      {/* Janela para mover jogador */}
+      {sheetFor && sheetSide && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center" onClick={() => setSheetFor(null)}>
+          <div role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} className="bg-white rounded-t-[2rem] p-6 w-full max-w-md flex flex-col gap-3">
+            <h3 className="text-2xl font-black text-gray-800">{nameOf[sheetFor]}</h3>
+            <p className="text-gray-500 font-bold">Está {whereText}. O que você quer fazer?</p>
+            {sheetSide !== 'c' && (
+              <button onClick={() => moveTo(sheetFor, 'c')} disabled={champIds.length >= MAX_PER_TEAM} className="bg-green-500 text-white text-lg font-black py-4 rounded-2xl border-b-4 border-green-700 disabled:opacity-40">
+                {sheetSide === 'b' ? 'Colocar no' : 'Passar para o'} {CHAMPION_NAME}
+              </button>
+            )}
+            {sheetSide !== 'h' && (
+              <button onClick={() => moveTo(sheetFor, 'h')} disabled={challIds.length >= MAX_PER_TEAM} className="bg-orange-500 text-white text-lg font-black py-4 rounded-2xl border-b-4 border-orange-700 disabled:opacity-40">
+                {sheetSide === 'b' ? 'Colocar no' : 'Passar para o'} {CHALLENGER_NAME}
+              </button>
+            )}
+            {sheetSide !== 'b' && (
+              <button onClick={() => moveTo(sheetFor, 'b')} className="bg-gray-100 text-gray-700 text-lg font-black py-4 rounded-2xl border-b-4 border-gray-300">
+                Mandar para o banco de areia
+              </button>
+            )}
+            {(champIds.length >= MAX_PER_TEAM || challIds.length >= MAX_PER_TEAM) && (
+              <p className="text-gray-500 font-bold text-xs">Um time cheio (7 jogadores) não aceita mais ninguém.</p>
+            )}
+            <button onClick={() => setSheetFor(null)} className="text-gray-500 font-black py-2">Voltar</button>
           </div>
         </div>
       )}
 
-      <div className="flex gap-4 mb-8 relative z-10">
-        <div className="flex-1 bg-green-50 border-4 border-green-500 rounded-[2rem] p-3 shadow-sm relative overflow-hidden">
-          <input type="text" value={champName} onChange={e => setChampName(e.target.value)} className="w-full bg-white/50 font-black text-green-900 text-center mb-3 border-b-4 border-green-300 outline-none p-2 rounded-xl text-sm focus:bg-white transition-colors" />
-          <div className="flex flex-col gap-2 min-h-[150px]">
-            {championIds.map(id => (
-              <div key={id} className={`text-white font-black p-2 rounded-xl flex justify-between items-center text-sm shadow-sm transition-all ${champCaptainId === id ? 'bg-green-600 ring-2 ring-yellow-400 scale-[1.02]' : 'bg-green-500 hover:bg-green-600'}`}>
-                <div className="flex items-center gap-1 truncate">
-                  <button onClick={() => setChampCaptainId(id)} className={`text-lg transition-transform active:scale-75 ${champCaptainId === id ? 'opacity-100' : 'opacity-30 grayscale hover:grayscale-0'}`} title="Passar a braçadeira">👑</button>
-                  <span className="truncate">{playersMap[id]}</span>
-                </div>
-                <button onClick={() => movePlayer(id, 'champ', 'pool')} className="bg-green-700 text-green-100 px-2 py-1 rounded-lg transition-colors hover:bg-green-800 shadow-sm">✕</button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex-1 bg-red-50 border-4 border-red-500 rounded-[2rem] p-3 shadow-sm relative overflow-hidden">
-          <input type="text" value={challName} onChange={e => setChallName(e.target.value)} className="w-full bg-white/50 font-black text-red-900 text-center mb-3 border-b-4 border-red-300 outline-none p-2 rounded-xl text-sm focus:bg-white transition-colors" />
-          <div className="flex flex-col gap-2 min-h-[150px]">
-            {challengerIds.map(id => (
-              <div key={id} className={`text-white font-black p-2 rounded-xl flex justify-between items-center text-sm shadow-sm transition-all ${challCaptainId === id ? 'bg-red-600 ring-2 ring-yellow-400 scale-[1.02]' : 'bg-red-500 hover:bg-red-600'}`}>
-                <div className="flex items-center gap-1 truncate">
-                  <button onClick={() => setChallCaptainId(id)} className={`text-lg transition-transform active:scale-75 ${challCaptainId === id ? 'opacity-100' : 'opacity-30 grayscale hover:grayscale-0'}`} title="Passar a braçadeira">👑</button>
-                  <span className="truncate">{playersMap[id]}</span>
-                </div>
-                <button onClick={() => movePlayer(id, 'chall', 'pool')} className="bg-red-700 text-red-100 px-2 py-1 rounded-lg transition-colors hover:bg-red-800 shadow-sm">✕</button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <button onClick={handleSave} disabled={saving || championIds.length === 0 || challengerIds.length === 0} className="w-full bg-orange-500 text-white text-3xl font-black py-6 rounded-[2rem] border-b-8 border-orange-700 active:border-b-0 active:translate-y-2 transition-all disabled:opacity-50 shadow-lg relative z-10">
-        {saving ? 'Anotando na areia...' : 'BOLA PRO ALTO! 🏐'}
-      </button>
-
-      {showAbortModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-sm shadow-2xl border-b-8 border-red-500 animate-in zoom-in duration-200 text-center">
-            <div className="text-7xl mb-4 drop-shadow-md">⛈️</div>
-            <h2 className="text-3xl font-black text-red-700 mb-2 leading-tight">Murchar a bola?</h2>
-            <p className="text-gray-500 font-bold mb-6">Tem certeza? O juiz já tava passando protetor solar!</p>
+      {showAbort && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true">
+          <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm text-center">
+            <div className="text-5xl mb-2" aria-hidden="true">🛑</div>
+            <h2 className="text-2xl font-black text-gray-800 mb-2">Abortar a rodada?</h2>
+            <p className="text-gray-500 font-bold mb-5">Isso encerra a rodada toda, sem gravar nada.</p>
             <div className="flex flex-col gap-3">
-              <button onClick={executeAbort} className="bg-red-500 text-white text-2xl font-black py-4 rounded-2xl border-b-8 border-red-700 active:border-b-0 active:translate-y-2 transition-all">Sim, furou! 🛑</button>
-              <button onClick={() => setShowAbortModal(false)} className="bg-gray-100 text-gray-600 text-xl font-black py-4 rounded-2xl border-b-4 border-gray-300 active:translate-y-1 transition-all">Não, bora pro jogo! 🏐</button>
+              <button onClick={abort} disabled={busy} className="bg-red-500 text-white text-xl font-black py-4 rounded-2xl border-b-8 border-red-700 active:border-b-0 active:translate-y-2 transition-all disabled:opacity-50">Abortar</button>
+              <button onClick={() => setShowAbort(false)} className="bg-gray-100 text-gray-600 text-lg font-black py-3 rounded-2xl">Voltar</button>
             </div>
           </div>
         </div>
+      )}
+
+      {toast && (
+        <div role="status" className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white font-bold px-4 py-2 rounded-full z-50 text-sm">{toast}</div>
       )}
     </div>
   );

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
 // --- TIPAGENS ---
-export type Role = 'admin' | 'writer' | 'viewer';
+export type Role = 'admin' | 'viewer';
 
 export interface Player {
   id: string;
@@ -25,8 +25,14 @@ export const getStoredToken = (slug: string): string | null => {
 
 export const getStoredRole = (slug: string): Role => {
   if (typeof window === 'undefined') return 'viewer';
+  // Token antigo (sem assinatura, formato base64 sem ponto) não vale mais: pede o PIN de novo.
+  const token = localStorage.getItem(`avl_token_${slug}`);
+  if (token && !token.includes('.')) {
+    clearAuth(slug);
+    return 'viewer';
+  }
   const role = localStorage.getItem(`avl_role_${slug}`);
-  if (role === 'admin' || role === 'writer') return role;
+  if (token && role === 'admin') return 'admin';
   return 'viewer';
 };
 
@@ -82,7 +88,7 @@ export function useAVLAuth(slug: string) {
 // --- MODAL DE PIN (Estilo Yoshi) ---
 interface PinModalProps {
   slug: string;
-  requiredRole: 'admin' | 'writer';
+  requiredRole: 'admin';
   onSuccess: () => void;
   onClose: () => void;
 }
@@ -107,11 +113,7 @@ export function PinModal({ slug, requiredRole, onSuccess, onClose }: PinModalPro
       const data = await res.json();
       
       if (data.ok) {
-        const roleHierarchy = { admin: 3, writer: 2, viewer: 1 };
-        const userLevel = roleHierarchy[data.role as keyof typeof roleHierarchy] || 1;
-        const requiredLevel = roleHierarchy[requiredRole];
-
-        if (userLevel >= requiredLevel) {
+        if (data.role === requiredRole) {
           saveAuth(slug, data.token, data.role);
           onSuccess();
         } else {

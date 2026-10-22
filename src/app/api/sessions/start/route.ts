@@ -1,59 +1,52 @@
 import { NextResponse } from 'next/server';
+import { requireRole, isErrorResponse } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { allPlayersBelongToGroup, cleanIdList, defaultRoundName, fail, getGroupId, hasDuplicates } from '@/lib/sessions';
 
+// Iniciar rodada/partida: sempre cria uma sessão nova. Nunca reaproveita a ativa.
 export async function POST(request: Request) {
+  const auth = requireRole(request, 'admin');
+  if (isErrorResponse(auth)) return auth;
+
   try {
-    // 🚨 AQUI: Agora recebemos a description (descrição/nome da rodada)
     const { slug, present_player_ids, description } = await request.json();
 
-    if (!slug) return NextResponse.json({ error: 'Faltou a liga' }, { status: 400 });
+    if (!slug) return fail('Faltou a liga', 400);
 
-    const { data: group } = await supabase.from('groups').select('id').eq('slug', slug).single();
-    if (!group) return NextResponse.json({ error: 'Liga não encontrada.' }, { status: 404 });
+    const present = cleanIdList(present_player_ids);
+    if (!present) return fail('Lista de presentes inválida.', 400);
+    if (hasDuplicates(present)) return fail('Tem jogador repetido na lista de presentes.', 400);
 
-    // Se a pessoa não digitou nada, criamos um nome padrão com a data de hoje
-    const sessionName = description?.trim() || `Rodada ${new Date().toLocaleDateString('pt-BR')}`;
+    const groupId = await getGroupId(slug);
+    if (!groupId) return fail('Liga não encontrada.', 404);
 
-    // Verifica se JÁ EXISTE uma rodada aberta
+    if (!(await allPlayersBelongToGroup(groupId, present))) {
+      return fail('Tem jogador na lista que não faz parte da liga.', 400);
+    }
+
     const { data: existing } = await supabase
       .from('sessions')
       .select('id')
-      .eq('group_id', group.id)
+      .eq('group_id', groupId)
       .eq('status', 'active')
-      .maybeSingle(); 
+      .maybeSingle();
 
     if (existing) {
-      const { data: updatedSession, error: updateError } = await supabase
-        .from('sessions')
-        .update({ 
-          present_player_ids: present_player_ids || [],
-          description: sessionName // Atualiza o nome também
-        })
-        .eq('id', existing.id)
-        .select()
-        .single();
-      
-      if (updateError) throw updateError;
-      return NextResponse.json({ ok: true, session: updatedSession });
+      return fail('Já tem uma partida em andamento. Encerre ou use Trocar Times.', 409);
     }
 
-    // Cria a rodada nova salvando a descrição
+    const name = typeof description === 'string' && description.trim() ? description.trim().slice(0, 80) : defaultRoundName('rodada');
+
     const { data: session, error } = await supabase
       .from('sessions')
-      .insert({ 
-        group_id: group.id, 
-        status: 'active',
-        present_player_ids: present_player_ids || [],
-        description: sessionName // 🚨 Salvando no banco!
-      })
+      .insert({ group_id: groupId, status: 'active', present_player_ids: present, description: name })
       .select()
       .single();
 
     if (error) throw error;
     return NextResponse.json({ ok: true, session });
-
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ error: 'Erro ao abrir a quadra.' }, { status: 500 });
+    return fail('Erro ao abrir a quadra.', 500);
   }
 }

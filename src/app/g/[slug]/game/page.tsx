@@ -1,192 +1,240 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { apiFetch, getStoredRole } from '@/lib/avlClient';
+import { CHAMPION_NAME, CHALLENGER_NAME, lineupNames, countSets } from '@/lib/teams';
 
+interface SessionRow {
+  id: string;
+  description?: string | null;
+  champion_name?: string | null;
+  challenger_name?: string | null;
+  champion_player_ids?: string[];
+  challenger_player_ids?: string[];
+}
+
+// Aba "Partida": todos veem o placar ao vivo e a escalação. Só o admin vê os botões.
 export default function Game() {
   const { slug } = useParams() as { slug: string };
   const router = useRouter();
-  
-  const [sessionInfo, setSessionInfo] = useState<any>(null);
-  const [sets, setSets] = useState<any[]>([]);
-  const [recording, setRecording] = useState(false);
-  const [showEndModal, setShowEndModal] = useState(false);
+
+  const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState<SessionRow | null>(null);
+  const [sets, setSets] = useState<{ winner: string }[]>([]);
+  const [playersMap, setPlayersMap] = useState<Record<string, string>>({});
   const [isAdmin, setIsAdmin] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState<'swap' | 'end' | null>(null);
 
+  useEffect(() => { setIsAdmin(getStoredRole(slug) === 'admin'); }, [slug]);
+
+  const loadData = useCallback(async () => {
+    try {
+      const [sessRes, playRes] = await Promise.all([
+        apiFetch(slug, `/api/sessions/active?slug=${slug}`),
+        apiFetch(slug, `/api/players/list?slug=${slug}`).catch(() => null),
+      ]);
+      const data = await sessRes.json();
+      setSession(data.activeSession || null);
+      setSets(data.activeSession ? data.sets || [] : []);
+      if (playRes && playRes.ok) {
+        const pd = await playRes.json();
+        const map: Record<string, string> = {};
+        pd.players?.forEach((p: { id: string; name: string }) => { map[p.id] = p.name; });
+        setPlayersMap(map);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }, [slug]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // Quem só assiste vê o placar atualizar sozinho.
   useEffect(() => {
-    // CORREÇÃO DA EXPULSÃO INSTANTÂNEA: Lê a permissão direto da memória na mesma hora.
-    const currentRole = getStoredRole(slug);
-    if (currentRole === 'viewer') {
-      router.push(`/g/${slug}`);
-    } else {
-      if (currentRole === 'admin') setIsAdmin(true);
-    }
-  }, [slug, router]);
+    if (isAdmin) return;
+    const t = setInterval(loadData, 8000);
+    return () => clearInterval(t);
+  }, [isAdmin, loadData]);
 
-  const loadData = () => {
-    apiFetch(slug, `/api/sessions/active?slug=${slug}`)
-      .then(res => res.json())
-      .then(data => {
-        if (!data.session || !data.session.champion_name) {
-          router.push(`/g/${slug}`);
-          return;
-        }
-        setSessionInfo(data.session);
-        setSets(data.sets || []);
-      })
-      .catch(err => console.error(err));
+  const call = async (endpoint: string, body: object, failMsg: string) => {
+    setBusy(true);
+    try {
+      const res = await apiFetch(slug, endpoint, { method: 'POST', body: JSON.stringify(body) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || failMsg);
+        return false;
+      }
+      return true;
+    } catch {
+      alert(failMsg);
+      return false;
+    } finally {
+      setBusy(false);
+    }
   };
 
-  useEffect(() => { loadData(); }, [slug]);
-
-  // Contagem de vitórias
-  const champWins = sets.filter(s => s.winner === 'champion').length;
-  const challWins = sets.filter(s => s.winner === 'challenger').length;
-
-  // Registrar Vitória
   const handleWin = async (winner: 'champion' | 'challenger') => {
-    setRecording(true);
-    try {
-      await apiFetch(slug, '/api/sets/record', {
-        method: 'POST',
-        body: JSON.stringify({ session_id: sessionInfo.id, winner })
-      });
-      loadData(); // Recarrega os dados pra atualizar o placar na tela
-    } catch (e) {
-      alert("Erro ao anotar a vitória!");
-    } finally {
-      setRecording(false);
-    }
+    if (!session) return;
+    if (await call('/api/sets/record', { session_id: session.id, winner }, 'Erro ao anotar a vitória!')) loadData();
   };
 
-  // Desfazer Último Set
   const handleUndo = async () => {
-    if (sets.length === 0) return;
-    setRecording(true);
-    try {
-      await apiFetch(slug, '/api/sets/undo', {
-        method: 'POST',
-        body: JSON.stringify({ session_id: sessionInfo.id })
-      });
-      loadData(); 
-    } catch (e) {
-      alert("Não deu pra desfazer.");
-    } finally {
-      setRecording(false);
+    if (!session || sets.length === 0) return;
+    if (await call('/api/sets/undo', { session_id: session.id }, 'Não deu pra desfazer.')) loadData();
+  };
+
+  const handleSwap = async () => {
+    if (!session) return;
+    if (await call('/api/sessions/swap', { session_id: session.id }, 'Não deu pra trocar os times.')) {
+      router.push(`/g/${slug}/setup`);
     }
   };
 
-  // Encerrar o dia de Vôlei
-  const executeEndSession = async () => {
-    try {
-      await apiFetch(slug, '/api/sessions/end', {
-        method: 'POST',
-        body: JSON.stringify({ session_id: sessionInfo.id })
-      });
-      router.push(`/g/${slug}`);
-    } catch (e) {
-      alert("Erro ao fechar a quadra.");
-    }
+  const handleEnd = async () => {
+    if (!session) return;
+    if (await call('/api/sessions/end', { session_id: session.id }, 'Erro ao fechar a quadra.')) router.push(`/g/${slug}`);
   };
 
-  if (!sessionInfo) return <div className="min-h-screen bg-green-50 flex items-center justify-center"><h2 className="text-green-800 font-black text-2xl animate-pulse">Limpando os óculos... 🕶️</h2></div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-green-100 flex items-center justify-center">
+        <h2 className="text-green-800 font-black text-2xl animate-pulse">Limpando os óculos... 🕶️</h2>
+      </div>
+    );
+  }
 
-  return (
-    <div className="min-h-screen bg-gray-900 flex flex-col font-sans relative overflow-hidden">
-      
-      {/* HEADER ESCURO (Foco total nos botões) */}
-      <div className="flex justify-between items-center p-4 bg-black/40 backdrop-blur-md relative z-20">
-        <button onClick={() => router.push(`/g/${slug}`)} className="text-gray-300 font-black flex items-center gap-2">
-          <span>◀</span> Sair
-        </button>
-        <div className="flex gap-2">
-          <button onClick={() => router.push(`/g/${slug}/setup`)} className="bg-blue-500/20 text-blue-400 border border-blue-500/50 px-3 py-2 rounded-xl font-black text-sm active:bg-blue-500/40">
+  const shell = (children: React.ReactNode) => (
+    <div className="min-h-screen bg-green-100 p-4 pb-28 max-w-md mx-auto font-sans flex flex-col gap-4">
+      {children}
+    </div>
+  );
+
+  // Sem partida
+  if (!session) {
+    return shell(
+      <div className="bg-white rounded-[2rem] p-8 text-center shadow-sm border-b-8 border-green-200 mt-6">
+        <div className="text-6xl mb-2" aria-hidden="true">😴</div>
+        <h1 className="text-2xl font-black text-green-800">Nenhuma partida no momento</h1>
+        <p className="text-gray-500 font-bold mt-2">Quando o admin iniciar, o placar ao vivo aparece aqui.</p>
+        {isAdmin && (
+          <button onClick={() => router.push(`/g/${slug}/setup`)} className="mt-5 w-full bg-green-500 text-white text-xl font-black py-4 rounded-2xl border-b-4 border-green-700 active:border-b-0 active:translate-y-1 transition-all">
+            Iniciar partida
+          </button>
+        )}
+      </div>,
+    );
+  }
+
+  // Partida sem times
+  if (!session.champion_name || !session.challenger_name) {
+    return shell(
+      <div className="bg-white rounded-[2rem] p-8 text-center shadow-sm border-b-8 border-green-200 mt-6">
+        <div className="text-6xl mb-2" aria-hidden="true">📋</div>
+        <h1 className="text-2xl font-black text-green-800">Partida sem times</h1>
+        <p className="text-gray-500 font-bold mt-2">Os times ainda não foram definidos.</p>
+        {isAdmin && (
+          <button onClick={() => router.push(`/g/${slug}/setup`)} className="mt-5 w-full bg-orange-500 text-white text-xl font-black py-4 rounded-2xl border-b-4 border-orange-700 active:border-b-0 active:translate-y-1 transition-all">
+            Configurar times
+          </button>
+        )}
+      </div>,
+    );
+  }
+
+  const [a, b] = countSets(sets);
+  const champ = lineupNames(session.champion_name, session.champion_player_ids, playersMap);
+  const chall = lineupNames(session.challenger_name, session.challenger_player_ids, playersMap);
+
+  return shell(
+    <>
+      {isAdmin && (
+        <div className="grid grid-cols-2 gap-3">
+          <button onClick={() => setConfirm('swap')} disabled={busy} className="bg-white text-blue-600 font-black py-3 rounded-2xl border-b-4 border-blue-200 active:translate-y-1 active:border-b-0 disabled:opacity-50">
             🔄 Trocar Times
           </button>
-          {isAdmin && (
-            <button onClick={() => setShowEndModal(true)} className="bg-red-500/20 text-red-400 border border-red-500/50 px-3 py-2 rounded-xl font-black text-sm active:bg-red-500/40">
-              🛑 Encerrar Dia
-            </button>
-          )}
+          <button onClick={() => setConfirm('end')} disabled={busy} className="bg-white text-red-600 font-black py-3 rounded-2xl border-b-4 border-red-200 active:translate-y-1 active:border-b-0 disabled:opacity-50">
+            🛑 Encerrar
+          </button>
+        </div>
+      )}
+
+      <div className="bg-orange-500 rounded-[2rem] p-5 text-white shadow-lg border-b-8 border-orange-700 text-center">
+        <div className="flex items-center justify-center gap-2 mb-1">
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-white" />
+          </span>
+          <span className="font-black text-sm tracking-widest">AO VIVO</span>
+        </div>
+        {session.description && <div className="text-orange-100 font-bold text-sm">{session.description}</div>}
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mt-2">
+          <span className="font-black text-sm">{CHAMPION_NAME}</span>
+          <span className="font-black text-6xl tabular-nums" aria-label={`${a} a ${b}`}>{a} x {b}</span>
+          <span className="font-black text-sm">{CHALLENGER_NAME}</span>
         </div>
       </div>
 
-      <div className="text-center py-4 relative z-20">
-        <h2 className="text-gray-400 font-black tracking-widest text-sm uppercase">Sets Jogados: {sets.length}</h2>
-      </div>
-
-      {/* ÁREA GIGANTE DOS BOTÕES */}
-      <div className="flex-1 flex flex-col sm:flex-row gap-4 p-4 pb-24 relative z-20">
-        
-        {/* TIME VERDE */}
-        <button 
-          onClick={() => handleWin('champion')} 
-          disabled={recording}
-          className="flex-1 bg-green-500 rounded-[2.5rem] border-b-[12px] border-green-700 active:border-b-0 active:translate-y-3 transition-all flex flex-col items-center justify-center shadow-2xl relative overflow-hidden group disabled:opacity-70 disabled:scale-95"
-        >
-          <div className="absolute inset-0 bg-white/10 opacity-0 group-active:opacity-100 transition-opacity" />
-          <div className="flex items-center gap-2 text-8xl font-black text-green-900 drop-shadow-md">
-            <span>{champWins}</span>
-            <span className="text-5xl">🏐</span> {/* Ícone de Vôlei TEMÁTICO! */}
+      {isAdmin && (
+        <div className="bg-white rounded-[2rem] p-5 shadow-sm border-b-8 border-green-200">
+          <h2 className="font-black text-green-800 text-lg mb-3">Quem ganhou o set?</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={() => handleWin('champion')} disabled={busy} className="bg-green-500 text-white text-xl font-black py-8 rounded-2xl border-b-8 border-green-700 active:border-b-0 active:translate-y-2 transition-all disabled:opacity-60">
+              {CHAMPION_NAME}
+            </button>
+            <button onClick={() => handleWin('challenger')} disabled={busy} className="bg-orange-500 text-white text-xl font-black py-8 rounded-2xl border-b-8 border-orange-700 active:border-b-0 active:translate-y-2 transition-all disabled:opacity-60">
+              {CHALLENGER_NAME}
+            </button>
           </div>
-          {/* Nome curto e sem quebra de linha! */}
-          <span className="text-3xl font-black text-white mt-4 text-center px-4 leading-tight drop-shadow-md">
-            {sessionInfo.champion_name}
-          </span>
-          <span className="mt-6 bg-green-900/30 text-green-100 px-6 py-2 rounded-full font-black text-lg backdrop-blur-sm border border-green-400/30">
-            CRAVOU! 🔥
-          </span>
-        </button>
+          <button onClick={handleUndo} disabled={busy || sets.length === 0} className="mt-3 w-full bg-yellow-300 text-yellow-900 font-black text-lg py-4 rounded-2xl border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1 disabled:opacity-40">
+            ↩ Desfazer último set
+          </button>
+          <p className="text-gray-500 font-bold text-sm mt-3">Só o vencedor do set entra aqui. Os pontos ficam na quadra.</p>
+        </div>
+      )}
 
-        {/* TIME VERMELHO/LARANJA */}
-        <button 
-          onClick={() => handleWin('challenger')} 
-          disabled={recording}
-          className="flex-1 bg-orange-500 rounded-[2.5rem] border-b-[12px] border-orange-700 active:border-b-0 active:translate-y-3 transition-all flex flex-col items-center justify-center shadow-2xl relative overflow-hidden group disabled:opacity-70 disabled:scale-95"
-        >
-          <div className="absolute inset-0 bg-white/10 opacity-0 group-active:opacity-100 transition-opacity" />
-          <div className="flex items-center gap-2 text-8xl font-black text-orange-900 drop-shadow-md">
-            <span>{challWins}</span>
-            <span className="text-5xl">🏐</span> {/* Ícone de Vôlei TEMÁTICO! */}
-          </div>
-          {/* Nome curto e sem quebra de linha! */}
-          <span className="text-3xl font-black text-white mt-4 text-center px-4 leading-tight drop-shadow-md">
-            {sessionInfo.challenger_name}
-          </span>
-          <span className="mt-6 bg-orange-900/30 text-orange-100 px-6 py-2 rounded-full font-black text-lg backdrop-blur-sm border border-orange-400/30">
-            CRAVOU! 🔥
-          </span>
-        </button>
-
+      <div className="bg-white rounded-[2rem] p-5 shadow-sm border-b-8 border-green-200">
+        <h2 className="font-black text-green-800 text-lg mb-3">Escalação</h2>
+        <div className="grid grid-cols-2 gap-3">
+          {[{ title: CHAMPION_NAME, list: champ, color: 'text-green-700' }, { title: CHALLENGER_NAME, list: chall, color: 'text-orange-600' }].map((t) => (
+            <div key={t.title}>
+              <h3 className={`font-black ${t.color} mb-1`}>{t.title}</h3>
+              <ul className="font-bold text-gray-700 leading-snug">
+                {t.list.map((p, i) => (
+                  <li key={i}>{p.name}{p.captain && <span className="ml-1 text-[10px] font-black text-orange-500 uppercase">capitão</span>}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* RODAPÉ: BOTÃO DESFAZER */}
-      <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-gray-900 via-gray-900/90 to-transparent z-30 flex justify-center">
-        <button 
-          onClick={handleUndo} 
-          disabled={sets.length === 0 || recording}
-          className="bg-gray-800 text-gray-400 border-2 border-gray-700 px-6 py-3 rounded-2xl font-black text-lg active:scale-95 transition-transform disabled:opacity-30 flex items-center gap-2 shadow-lg"
-        >
-          <span>↩️</span> Desfazer último set
-        </button>
-      </div>
-
-      {/* MODAL CÔMICO DE ENCERRAR O DIA */}
-      {showEndModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-[2.5rem] p-8 w-full max-w-sm shadow-2xl border-b-8 border-gray-900 animate-in zoom-in duration-200 text-center">
-            <div className="text-7xl mb-4 drop-shadow-lg">🚿</div>
-            <h2 className="text-3xl font-black text-white mb-2 leading-tight">Bora pro banho?</h2>
-            <p className="text-gray-400 font-bold mb-6 text-lg">Isso vai encerrar a rodada de hoje e salvar tudo no histórico. Todo mundo já cansou?</p>
+      {confirm && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true">
+          <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm text-center">
+            <div className="text-5xl mb-2" aria-hidden="true">{confirm === 'swap' ? '🔄' : '🚿'}</div>
+            <h2 className="text-2xl font-black text-gray-800 mb-2">{confirm === 'swap' ? 'Trocar os times?' : 'Bora pro banho?'}</h2>
+            <p className="text-gray-500 font-bold mb-5">
+              {confirm === 'swap'
+                ? 'A partida atual termina com os sets já ganhos e você monta os times de novo.'
+                : 'Isso encerra a partida e a rodada, e salva tudo no histórico.'}
+            </p>
             <div className="flex flex-col gap-3">
-              <button onClick={executeEndSession} className="bg-red-500 text-white text-2xl font-black py-4 rounded-2xl border-b-8 border-red-700 active:border-b-0 active:translate-y-2 transition-all">Encerrar a brincadeira 🛑</button>
-              <button onClick={() => setShowEndModal(false)} className="bg-gray-700 text-gray-300 text-xl font-black py-4 rounded-2xl border-b-4 border-gray-900 active:translate-y-1">Ainda tem fôlego! 🏐</button>
+              <button
+                onClick={() => { const c = confirm; setConfirm(null); if (c === 'swap') handleSwap(); else handleEnd(); }}
+                className={`${confirm === 'swap' ? 'bg-blue-500 border-blue-700' : 'bg-red-500 border-red-700'} text-white text-xl font-black py-4 rounded-2xl border-b-8 active:border-b-0 active:translate-y-2 transition-all`}
+              >
+                {confirm === 'swap' ? 'Trocar times' : 'Encerrar'}
+              </button>
+              <button onClick={() => setConfirm(null)} className="bg-gray-100 text-gray-600 text-lg font-black py-3 rounded-2xl">Voltar</button>
             </div>
           </div>
         </div>
       )}
-      
-    </div>
+    </>,
   );
 }

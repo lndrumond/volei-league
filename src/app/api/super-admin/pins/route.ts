@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireRole, isErrorResponse } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
 function generatePin(): string {
@@ -7,6 +8,9 @@ function generatePin(): string {
 }
 
 export async function GET(request: Request) {
+  const auth = requireRole(request, 'superadmin');
+  if (isErrorResponse(auth)) return auth;
+
   try {
     const { searchParams } = new URL(request.url);
     const slug = searchParams.get('slug');
@@ -84,6 +88,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const auth = requireRole(request, 'superadmin');
+  if (isErrorResponse(auth)) return auth;
+
   try {
     const { slug, player_ids } = await request.json();
 
