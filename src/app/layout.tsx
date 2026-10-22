@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
-import { Fredoka, Nunito } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 
 // Títulos em Fredoka (arredondada, esportiva) e texto em Nunito (legível em tela pequena).
-const fredoka = Fredoka({ subsets: ['latin'], weight: ['500', '600', '700'], variable: '--font-fredoka', display: 'swap' });
-const nunito = Nunito({ subsets: ['latin'], weight: ['500', '700', '800'], variable: '--font-nunito', display: 'swap' });
+// Os arquivos ficam em src/app/fonts (fontes variáveis, subconjunto latino): não dependem do Google em tempo de execução.
+const fredoka = localFont({ src: './fonts/fredoka-latin.woff2', weight: '500 700', variable: '--font-fredoka', display: 'swap' });
+const nunito = localFont({ src: './fonts/nunito-latin.woff2', weight: '500 800', variable: '--font-nunito', display: 'swap' });
 
 export const metadata: Metadata = {
   title: 'AVL | Amigos do Vôlei League',
