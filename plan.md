@@ -218,6 +218,32 @@ Objetivo: fixar como as telas funcionam antes de implementar. Não é o visual f
 
 ---
 
+## Fase C: Novidades 2.0 e analytics
+
+**Status: planejada e aprovada pelo dono em 22/10/2026. C1 revisada e aprovada pelo dono. C2 feita no código (branch `fase-c-novidades`, sem commit e sem deploy), aguardando teste do dono no navegador antes da C3.**
+
+Etapas, uma por vez (C1 só começa depois da aprovação do dono):
+
+- **C1, Analytics da Vercel:** instalar `@vercel/analytics` e o componente no layout raiz. Sem aviso no app. Conferir o limite do plano gratuito. Sem presença "online agora" (fora deste ciclo). **Feita no código** (branch `fase-c-novidades`): pacote 2.0.1, `<Analytics />` em `src/app/layout.tsx`. `tsc` e `next build` sem erros. Falta ativar o Web Analytics no painel da Vercel e publicar (deploy só com autorização).
+- **C2, Popup de novidades 2.0:** abre uma vez por versão e por aparelho. Versão guardada num lugar só do código (`2.0`); marca no armazenamento local do aparelho com a versão vista. Usa a janela de `src/components/ui`, com Esc, toque fora, foco preso e leitura para leitor de tela. Botão "Bora jogar!". **Feita no código:** `src/components/Novidades.tsx`, montado no `layout.tsx` da liga e só nas abas da barra inferior (não abre por cima da prancheta). Chave `avl-novidades-vista`. `tsc`, lint do arquivo e `next build` sem erros.
+- **C3, Item "Novidades" no rodapé do Dashboard:** reabre o popup quando quiser. **Feita no código:** botão "Ver novidades da versão 2.0" acima do crédito, no Dashboard. Dispara o evento `avl-novidades-abrir`, que o `Novidades` escuta. `tsc`, lint e `next build` sem erros. Falta o teste do dono no navegador.
+
+**Texto do popup (aprovado com ajustes):**
+- Título: "Novidades · versão 2.0". Subtítulo: "Mudou muita coisa. Olha o que tem de novo:"
+- Ordem na tela (ajustada pelo dono em 22/10/2026): intro, notas do desenvolvedor, itens, botão, crédito centralizado em itálico.
+- Itens (uma linha cada, com ícone):
+  - 🏆 **Mural dos Campeões:** o campeão de cada mês, do mais recente ao mais antigo.
+  - ⚖️ **Sorteio mais equilibrado:** os times são montados com base na avaliação do grupo (sem mostrar as notas).
+  - 📅 **Campeão do mês no início:** a honraria aparece na tela inicial.
+  - 🎨 **Visual novo:** cores, botões e placar redesenhados.
+- Notas do desenvolvedor: "A fim de melhorar a experiência, fizemos algumas mudanças e adicionamos as novidades acima."
+- Crédito: "Desenvolvido por Leo · Amigos do Vôlei", com link para o perfil do GitHub (a confirmar o usuário exato).
+- Botão: "Bora jogar!"
+
+**Fora deste ciclo:** "Quantos online agora" (sem Supabase Presence, sem Upstash e sem Ably). Pode voltar depois, com decisão própria.
+
+---
+
 ## Backlog (fora deste ciclo, sem data)
 - **Definição de login:** como o admin entra e troca de aparelho. Depende do token de A1.
 - **PIN sem limite de tentativas:** PIN de 4 dígitos, sem bloqueio após erros.
@@ -249,6 +275,11 @@ Objetivo: fixar como as telas funcionam antes de implementar. Não é o visual f
 ---
 
 ## Histórico de alterações
+- **22/10/2026 (publicação da Fase C, autorizada pelo dono):** C1, C2 e C3 aprovadas. Tela de abertura do app instalado: cor de fundo do manifest trocada de `#E8F1F6` para o azul-mar `#1479B8` (opção 1, sem mexer nas imagens). Commit na `fase-c-novidades`, merge na `main` e push; a Vercel publica sozinha.
+- **22/10/2026 (C2 aprovada pelo dono no teste local, ajuste de ordem do popup feito):** C3 iniciada.
+- **22/10/2026 (C3, código):** botão "Ver novidades da versão 2.0" no rodapé do Dashboard, reabre o popup por evento (`avl-novidades-abrir`). `tsc`, lint e `next build` sem erros. Nenhum commit ou deploy.
+- **22/10/2026 (C2, código):** popup "Novidades · versão 2.0" (`src/components/Novidades.tsx`), uma vez por versão e por aparelho, montado no layout da liga e só nas abas da barra inferior. Texto aprovado, com link para o GitHub no nome do dono. `tsc`, lint do arquivo e `next build` sem erros. Não testado no navegador ainda. Nenhum commit ou deploy.
+- **22/10/2026 (C1, código):** Vercel Analytics instalado (`@vercel/analytics` 2.0.1) e `<Analytics />` no layout raiz. Branch `fase-c-novidades` criada a partir de `fase-a-etapa-a1`. `tsc` e `next build` sem erros. Nenhum commit, deploy ou escrita no banco. `npm audit` mostra vulnerabilidades já existentes nas dependências (não tratadas aqui).
 - **22/10/2026 (A7, deploy):** com autorização do dono, branch levada à `main` e publicada pela Vercel. Login, proteção das rotas, telas e totais conferidos em produção.
 - **22/10/2026 (B4, ajustes do dono):** placar com X no meio e caixas na cor do time, escalações do mesmo tamanho com faixa colorida, honraria em destaque, medalhas mais fortes, títulos com cor própria, datas do Histórico corrigidas. Commit local, sem deploy.
 - **22/10/2026 (B4):** contraste (3 tokens), contorno visível no escuro com sombra separada, h1 nas telas sem título, título por tela na aba, imagens e ícones leves com script, manifest no tema novo, lint de 5 para 1 erro, build de produção ok. B3 e B3.5 aprovadas. Commit local, sem deploy.

@@ -8,7 +8,7 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'Gerenciador oficial das rodadas de vôlei do nosso grupo.',
     start_url: '/',
     display: 'standalone', // abre como app, sem a barra do navegador
-    background_color: '#E8F1F6', // fundo do tema (--bg)
+    background_color: '#1479B8', // azul-mar da barra: cor da tela de abertura do app instalado
     theme_color: '#1479B8', // azul-mar do tema (--sea), cor da barra do celular
     icons: [
       { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },

@@ -8,6 +8,7 @@ import { MEDALS, top5 } from '@/lib/ranking';
 import { addMonths, currentMonthKey, monthName } from '@/lib/brMonth';
 import { Button, Card, Chip, Eyebrow, Lineup, Scoreboard, Sub, useToast } from '@/components/ui';
 import AppHeader, { AdminTag } from '@/components/AppHeader';
+import { NOVIDADES_ABRIR, NOVIDADES_VERSAO } from '@/components/Novidades';
 
 interface RankingItem { name: string; points: number; is_guest?: boolean; }
 interface SessionRow {
@@ -117,7 +118,16 @@ export default function Dashboard() {
         ) : undefined}
       />
       {children}
-      <p className="text-center text-xs font-bold text-muted mt-2">© {new Date().getFullYear()} Desenvolvido por Amigos do Vôlei</p>
+      <div className="flex flex-col items-center gap-1 mt-2">
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new Event(NOVIDADES_ABRIR))}
+          className="min-h-11 px-3 text-sm font-bold text-sea underline"
+        >
+          Ver novidades da versão {NOVIDADES_VERSAO}
+        </button>
+        <p className="text-center text-xs font-bold text-muted">© {new Date().getFullYear()} Desenvolvido por Amigos do Vôlei</p>
+      </div>
     </div>
   );
 

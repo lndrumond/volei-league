@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, usePathname } from 'next/navigation';
 import BottomNav, { type Tab } from '@/components/BottomNav';
+import Novidades from '@/components/Novidades';
 import { AUTH_EVENT, getStoredRole } from '@/lib/avlClient';
 
 // A barra fica aqui, no layout da liga, para não sumir quando a página muda: só o conteúdo troca.
@@ -40,6 +41,7 @@ export default function LeagueLayout({ children }: { children: React.ReactNode }
     <>
       {children}
       {active && <BottomNav slug={slug} active={active} showVote={isAdmin} voteUnlocked={voteUnlocked} />}
+      {active && <Novidades />}
     </>
   );
 }

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
 import { ToastProvider } from '@/components/ui/Toast';
+import { Analytics } from '@vercel/analytics/next';
 
 // Títulos em Fredoka (arredondada, esportiva) e texto em Nunito (legível em tela pequena).
 // Os arquivos ficam em src/app/fonts (fontes variáveis, subconjunto latino): não dependem do Google em tempo de execução.
@@ -41,6 +42,7 @@ export default function RootLayout({
             {children}
           </main>
         </ToastProvider>
+        <Analytics />
       </body>
     </html>
   );
