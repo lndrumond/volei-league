@@ -97,7 +97,7 @@ O "Amigos do Vôlei" é um Web App voltado para o gerenciamento de quadras/jogos
 - **Nunca apagar `sessions` nem `sets`.** Eles guardam o histórico e os pontos.
 - Tabela `votes_backup` guarda os votos de uma votação anterior, salva de propósito antes de zerar a votação. Não apagar.
 
-## Regras de Código (implementadas na branch `fase-a-etapa-a1`, ainda sem deploy)
+## Regras de Código (em produção desde 22/10/2026)
 - `setup-teams` só altera a `session` ativa. Se ela já estiver encerrada, recusa.
 - Trocar Times e Iniciar partida criam uma nova `session`. Não reaproveitam a ativa.
 - Abortar encerra a `session` ativa sem gravar nada.
@@ -113,11 +113,14 @@ O "Amigos do Vôlei" é um Web App voltado para o gerenciamento de quadras/jogos
 ## Pendências Conhecidas
 - **Writer:** removido do produto, do login e do front (A1). A coluna `writer_pin_hash` continua no banco, sem uso.
 - **RLS desligado em 9 tabelas** no Supabase. O servidor usa a service role, que ignora RLS. Habilitar RLS sem políticas não quebra o servidor, mas bloqueia o acesso com a chave anon. Plano separado.
-- **Autenticação:** token assinado pelo servidor (HMAC, segredo `AUTH_TOKEN_SECRET`), implementado na branch `fase-a-etapa-a1` e ainda sem deploy (etapa A1 do `plan.md`). As rotas de escrita exigem admin; as do Super Admin exigem super admin. Sem senha padrão. PIN sem limite de tentativas: backlog.
+- **Autenticação:** token assinado pelo servidor (HMAC, segredo `AUTH_TOKEN_SECRET`), em produção desde 22/10/2026 (etapa A1 do `plan.md`). As rotas de escrita exigem admin; as do Super Admin exigem super admin. Sem senha padrão. PIN sem limite de tentativas: backlog.
 - **Mockup funcional (etapa 0.1):** refeito e aprovado em 22/10/2026. Página privada: https://claude.ai/artifact/JzGtMCkre1K5vPZfqp8zyA (o mockup antigo, com placar de pontos, está descartado).
 - **Validação de times no servidor:** `setup-teams` hoje grava as listas sem checar. Falta recusar jogador repetido ou em dois times, e passar de 7 por time (etapa A2).
 
 ## Registro de Atualizações
+### [22/10/2026] - Etapa A7 (deploy em produção)
+- Fases A e B publicadas na `main` e na Vercel (https://volei-league.vercel.app), com `AUTH_TOKEN_SECRET` cadastrada pelo dono. Conferido em produção. Admins digitam o PIN de novo uma vez.
+
 ### [22/10/2026] - Fase B4 (revisão final, parte automática)
 - Contraste AA, contorno visível no escuro, foco, h1 e título por tela, imagens e ícones leves (script), manifest no tema novo, build de produção ok. Falta o teste do dono no celular real. Sem deploy.
 

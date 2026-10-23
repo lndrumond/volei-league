@@ -146,7 +146,12 @@ Objetivo: fixar como as telas funcionam antes de implementar. Não é o visual f
 - **Modelo sugerido:** Opus 5.5.
 - **Deploy:** nada aqui. O código só vai para produção na etapa A7, com autorização.
 
-### A7. Deploy (com autorização)
+### A7. Deploy (com autorização) ✅
+**Status: em produção desde 22/10/2026, com autorização do dono, que cadastrou `AUTH_TOKEN_SECRET` na Vercel antes. Branch `fase-a-etapa-a1` levada à `main` do GitHub (só avanço, `92d3f9c` → `4b435b9`); a Vercel publicou sozinha em https://volei-league.vercel.app.**
+- **Antes:** sem jogo em andamento (0 sessões ativas, 79 sessões, 431 sets); varredura de segredos nos arquivos e no histórico do git (nada encontrado); `.gitignore` ampliado (backups, originais pesados e fotos internas do banco, `plan-*.md`, saíram do GitHub e ficaram só no computador).
+- **Conferido em produção:** todas as telas respondem; `/estilo` dá 404; ícones e logo leves servidos; título por tela na aba; rota do mural com os campeões; Geral com 35 jogadores e 2200 pts (igual ao banco); senha do Super Admin gera token assinado (a variável está ativa); senha e PIN errados recusados (401); gravar set sem login recusado (401); `skill_rating` escondido para visitante.
+- **Efeito esperado:** cada admin digita o PIN de novo uma vez em cada aparelho; o Super Admin digita a chave mestra de novo.
+- **Rollback:** Vercel → Deployments → deploy anterior → Instant Rollback (ou reverter o commit no GitHub). Sem mudança no banco, então voltar é seguro.
 - Só depois de A6 aprovado e de autorização explícita do dono.
 - Variável nova de segredo adicionada na Vercel pelo dono, antes do deploy.
 - **Rollback:** reverter o código. Não há mudança de schema nesta fase.
@@ -244,6 +249,7 @@ Objetivo: fixar como as telas funcionam antes de implementar. Não é o visual f
 ---
 
 ## Histórico de alterações
+- **22/10/2026 (A7, deploy):** com autorização do dono, branch levada à `main` e publicada pela Vercel. Login, proteção das rotas, telas e totais conferidos em produção.
 - **22/10/2026 (B4, ajustes do dono):** placar com X no meio e caixas na cor do time, escalações do mesmo tamanho com faixa colorida, honraria em destaque, medalhas mais fortes, títulos com cor própria, datas do Histórico corrigidas. Commit local, sem deploy.
 - **22/10/2026 (B4):** contraste (3 tokens), contorno visível no escuro com sombra separada, h1 nas telas sem título, título por tela na aba, imagens e ícones leves com script, manifest no tema novo, lint de 5 para 1 erro, build de produção ok. B3 e B3.5 aprovadas. Commit local, sem deploy.
 - **22/10/2026 (B3.5, ajuste):** Ranking em três abas com emoji (Mês atual, Todos os tempos, Mural dos Campeões), mural carregado só ao abrir; botão do Dashboard abre o mural. Commit local, sem deploy.
