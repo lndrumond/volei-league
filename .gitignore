@@ -41,3 +41,18 @@ yarn-error.log*
 next-env.d.ts
 
 /.next-test/
+
+# testes locais do Claude (servidor isolado na porta 3100)
+/.next-build/
+
+# backups e originais pesados (ficam só no computador)
+*Bkp.md
+public/*Original.*
+
+# fotos internas do banco (nomes, pontos, ids de teste): só no computador
+plan-*.md
+
+# configurações locais de editor/ferramentas
+.claude/settings.local.json
+.vscode/
+*.log
