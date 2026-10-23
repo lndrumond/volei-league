@@ -12,6 +12,8 @@
   --ink: #0F2A43;
   --muted: #46606F;
   --line: #0F2A43;
+  /* sombra "fliperama" (no claro, igual ao contorno) */
+  --shadow: #0F2A43;
   --soft: #C6D9E5;
 
   --sea: #1479B8;
@@ -20,7 +22,7 @@
   --vest-ink: #2A1700;
   --sun: #FFC83D;
   --sun-ink: #0F2A43;
-  --danger: #C93A3A;
+  --danger: #B83232;
   --danger-ink: #FFFFFF;
   --ok: #16774B;
 
@@ -36,8 +38,10 @@
     --surface: #112B44;
     --surface2: #0D2238;
     --ink: #EAF4FA;
-    --muted: #9DB6C8;
-    --line: #040D18;
+    --muted: #A9C2D3;
+    /* contorno visível no escuro (>= 3:1 sobre fundo e cartões); a sombra continua escura */
+    --line: #5F84A3;
+    --shadow: #040D18;
     --soft: #25465F;
     --sea: #4DB0E8;
     --sea-ink: #04223A;
@@ -60,8 +64,9 @@
   --surface: #112B44;
   --surface2: #0D2238;
   --ink: #EAF4FA;
-  --muted: #9DB6C8;
-  --line: #040D18;
+  --muted: #A9C2D3;
+  --line: #5F84A3;
+  --shadow: #040D18;
   --soft: #25465F;
   --sea: #4DB0E8;
   --sea-ink: #04223A;
@@ -106,8 +111,8 @@
 
   --radius-card: 22px;
   --radius-inner: 16px;
-  --shadow-pop: 0 4px 0 var(--line);
-  --shadow-press: 0 1px 0 var(--line);
+  --shadow-pop: 0 4px 0 var(--shadow);
+  --shadow-press: 0 1px 0 var(--shadow);
 }
 
 body {

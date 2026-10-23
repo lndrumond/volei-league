@@ -10,6 +10,8 @@ O "Amigos do Vôlei" é um Web App voltado para o gerenciamento de quadras/jogos
 - **UI:** Estilo "Bubbly" / Botões de Fliperama (bordas grossas, cantos muito arredondados, cores vibrantes). Em redesenho: paleta descontraída e esportiva, com tom de app de respeito (ver `plan.md`).
 - **Usuários:** pessoas com pouca familiaridade digital. Mínimo de cliques, botões grandes, ação principal clara por tela.
 - **Uso:** celular para todos; computador só para o admin.
+- **Imagens:** as telas usam versões leves (`public/logo-header.png`, `icon-*.png`, `apple-icon.png`) geradas por `node scripts/gerar-imagens.mjs` a partir de `public/logo.png` e `public/bola.png`. Trocou a logo ou a bola: rodar o script de novo.
+- **Acessibilidade:** cores com contraste AA (no escuro, o contorno é azul-acinzentado e a sombra tem token próprio, `--shadow`); foco sempre visível; toda tela tem `h1` (visível ou só para leitor de tela, via `AppHeader pageHeading`) e o próprio nome na aba do navegador (`layout.tsx` da rota).
 
 ## Stack Tecnológica
 - **Framework:** Next.js 16 (App Router), React 19.
@@ -115,6 +117,9 @@ O "Amigos do Vôlei" é um Web App voltado para o gerenciamento de quadras/jogos
 - **Validação de times no servidor:** `setup-teams` hoje grava as listas sem checar. Falta recusar jogador repetido ou em dois times, e passar de 7 por time (etapa A2).
 
 ## Registro de Atualizações
+### [22/10/2026] - Fase B4 (revisão final, parte automática)
+- Contraste AA, contorno visível no escuro, foco, h1 e título por tela, imagens e ícones leves (script), manifest no tema novo, build de produção ok. Falta o teste do dono no celular real. Sem deploy.
+
 ### [22/10/2026] - Fase B3.5 (Mural dos Campeões)
 - `/api/rankings?month=AAAA-MM` e `/api/rankings/champions`; mural no Ranking, honraria do mês passado e título do mês no Dashboard; filtro Só Fixos removido. Meses em Brasília (`src/lib/brMonth.ts`, `src/lib/monthlyPoints.ts`). Sem tabela nova. Sem deploy.
 

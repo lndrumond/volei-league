@@ -174,8 +174,8 @@ Objetivo: fixar como as telas funcionam antes de implementar. Não é o visual f
 - Botão, Card, Chip de jogador, Modal, Toast (substitui `alert()`), Estado vazio, Barra inferior de 4 abas.
 - **Modelo sugerido:** Sonnet 5.5.
 
-### B3. Aplicar nas telas
-**Status: código pronto na branch `fase-a-etapa-a1` (22/10/2026), aguardando teste do dono e aprovação. Sem deploy.**
+### B3. Aplicar nas telas ✅
+**Status: aprovada pelo dono em 22/10/2026 ("em partes": placar do admin e passo 2 da prancheta ficam para o teste numa rodada real, item da B4). Sem deploy.**
 - **Telas migradas para os componentes e tokens:** Dashboard, Partida, Prancheta (passos 1 e 2, janela de mover jogador e confirmação de abortar), Histórico, Ranking, Votação (urna e sucesso) e Super Admin (login, alvos, PINs e auditoria). `/admin` continua só redirecionando para `/setup`.
 - **Novos:** `AppHeader` (logo, nome e tela), `ui/Team` (`TeamDot`, `Lineup`, `Scoreboard`), janela do PIN refeita com `Modal`. Todos os `alert()` viraram avisos (`useToast`); confirmações usam `ConfirmModal`.
 - **Rodapé global removido** (cobria a barra e forçava rolagem). O crédito "© ano Desenvolvido por Amigos do Vôlei" foi para o fim do Dashboard.
@@ -187,7 +187,8 @@ Objetivo: fixar como as telas funcionam antes de implementar. Não é o visual f
 - Ordem: Dashboard, Partida, Prancheta, Histórico, Ranking, Votação, Admin.
 - Prancheta é a mais complexa: **Opus 5.5**. Demais: **Sonnet 5.5**. Ajustes repetitivos de classe: **Haiku 5.5**.
 
-### B3.5. Mural dos Campeões ✅ (código; aguardando teste do dono)
+### B3.5. Mural dos Campeões ✅
+**Aprovada pelo dono em 22/10/2026.**
 **Status: código pronto na branch `fase-a-etapa-a1` (22/10/2026). B3 foi aprovada "em partes" pelo dono, que mandou fazer esta etapa antes da B4. Sem deploy.**
 - **Decisões do dono:** o mês conta pela data do **set** (jogo lançado depois cai no mês do registro); a honraria do campeão aparece já no dia 1º; o mural mostra todos os meses (limitar só se ficar grande); sem filtro de fixo/visitante no ranking.
 - **Horário:** o mês é sempre o de Brasília (dia 1 às 00:00, UTC-3, sem horário de verão). O Top 5 já usava Brasília; não há "reset" a fazer, o mês muda sozinho. Novo `src/lib/brMonth.ts` (chave `AAAA-MM`, `monthKeyOf`, `addMonths`, nomes) e `src/lib/monthlyPoints.ts` (pontos por jogador por mês, com busca paginada de 1000 em 1000).
@@ -198,7 +199,15 @@ Objetivo: fixar como as telas funcionam antes de implementar. Não é o visual f
 - **Modelo sugerido:** Sonnet 5.5.
 
 ### B4. Revisão final
-- Celular real e computador, contraste, foco, `aria-label`, imagens.
+**Status: revisão automática concluída na branch `fase-a-etapa-a1` (22/10/2026); falta o teste do dono no celular real e no computador. Sem deploy.**
+- **Contraste (WCAG AA, calculado para todos os pares de cor usados):** três ajustes de token. (1) Claro: vermelho `--danger` #C93A3A → #B83232 (sobre o fundo dava 4,42; agora 5,18). (2) Escuro: `--muted` #9DB6C8 → #A9C2D3 (sobre ouro/prata dava 4,11/4,42; agora ≥ 4,68). (3) Escuro: contorno `--line` #040D18 → #5F84A3 (quase preto sobre azul escuro, 1,35; agora 3,66 sobre os cartões e 4,56 sobre o fundo), com caixas de seleção, chips e botões visíveis; a sombra "fliperama" ganhou token próprio (`--shadow`) e continua escura. Laranja do colete sobre branco (2,33) ficou como está: só aparece em bolinha e borda, sempre junto do nome do time.
+- **Foco:** Tab pelo teclado mostra contorno azul de 3 px em todos os elementos, na ordem natural; nenhum lugar remove o contorno; janelas prendem o foco (já era assim).
+- **Nomes acessíveis:** varredura em todas as telas (Dashboard visitante e admin, Ranking, Partida, Histórico, Prancheta, Super Admin, Urna): nenhum botão, link ou campo sem nome; nenhum alvo de toque abaixo de 24 px; nenhuma imagem sem `alt`; sem rolagem lateral; `lang="pt-BR"`. Dashboard, Partida e Prancheta não tinham `h1`: o `AppHeader` ganhou `pageHeading` (h1 só para leitor de tela).
+- **Título da aba do navegador:** cada tela mostra o próprio nome ("Ranking · Amigos do Vôlei"), por `layout.tsx` de servidor em cada rota e modelo no layout raiz.
+- **Imagens:** a logo do cabeçalho (918 KB, desenhada com 44 px) e a bola (1 MB, usada como favicon e ícone do app) viraram versões leves: `logo-header.png` 5 KB, `icon-32.png` 1 KB, `apple-icon.png` 6 KB, `icon-192.png` 6 KB, `icon-512.png` 28 KB. Geradas por `scripts/gerar-imagens.mjs` (sharp, que já vem com o Next); rodar de novo ao trocar `logo.png` ou `bola.png`. O manifest tinha o verde antigo e tamanhos falsos: agora usa o azul-mar, o fundo do tema e os ícones nos tamanhos certos; a barra do celular segue o tema (claro/escuro). A tela de entrada (`/`) saiu do verde antigo.
+- **Computador (1280 px):** coluna centralizada com a barra embaixo; sem quebra.
+- **Código:** `tsc` sem erros; lint de 5 para 1 erro (Ranking sem `setState` em efeito, com respostas atrasadas ignoradas; rota de votos sem `any`). Fica o de `avlClient.tsx` (lê o login no efeito; mexer exige refazer a leitura do login, que apaga token antigo; baixo risco, backlog). Build de produção (`next build`) passou.
+- **Falta (dono):** abrir no celular real e no computador; numa rodada real, conferir o placar do admin, o passo 2 da prancheta e o Último confronto com partida em andamento; instalar o app na tela inicial para ver o ícone novo.
 - **Modelo sugerido:** Opus 5.5.
 
 ---
@@ -234,6 +243,7 @@ Objetivo: fixar como as telas funcionam antes de implementar. Não é o visual f
 ---
 
 ## Histórico de alterações
+- **22/10/2026 (B4):** contraste (3 tokens), contorno visível no escuro com sombra separada, h1 nas telas sem título, título por tela na aba, imagens e ícones leves com script, manifest no tema novo, lint de 5 para 1 erro, build de produção ok. B3 e B3.5 aprovadas. Commit local, sem deploy.
 - **22/10/2026 (B3.5, ajuste):** Ranking em três abas com emoji (Mês atual, Todos os tempos, Mural dos Campeões), mural carregado só ao abrir; botão do Dashboard abre o mural. Commit local, sem deploy.
 - **22/10/2026 (B3.5):** Mural dos Campeões no Ranking, honraria do campeão do mês passado e título do mês no Dashboard, ranking por mês escolhido, filtro Só Fixos removido. Mês em Brasília, pela data do set. Verificado por SQL de leitura e capturas. Commit local, sem deploy.
 - **22/10/2026 (B3, aba Votação):** a votação virou a 5ª aba da barra inferior, só para admin, apagada com cadeado até digitar a chave mestra; botão do Dashboard removido. Verificado em navegador sem interface: visitante vê 4 abas; admin com PIN vê 5 com cadeado; na página da votação a aba fica ativa; ao digitar a chave o cadeado some sem recarregar; visitante em `/super-admin` não vê barra. `tsc` sem erros. Commit local, sem deploy.

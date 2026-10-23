@@ -107,7 +107,7 @@ export default function Game() {
 
   const shell = (children: React.ReactNode) => (
     <div className="min-h-screen bg-bg text-ink p-4 pb-28 max-w-md mx-auto flex flex-col gap-3">
-      <AppHeader title="Partida" right={isAdmin ? <AdminTag /> : undefined} />
+      <AppHeader title="Partida" pageHeading right={isAdmin ? <AdminTag /> : undefined} />
       {children}
     </div>
   );

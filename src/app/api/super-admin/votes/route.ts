@@ -66,10 +66,13 @@ export async function GET(request: Request) {
       return NextResponse.json({ ok: true, votes: formatted });
     }
 
-    const formatted = (votes || []).map((v: any) => ({
+    // O join pode vir como objeto ou como lista, conforme o Supabase entende a relação.
+    type Who = { name?: string } | { name?: string }[] | null | undefined;
+    const nameOf = (w: Who) => (Array.isArray(w) ? w[0]?.name : w?.name) || 'Desconhecido';
+    const formatted = ((votes || []) as { id: string; score: number; created_at: string; voter?: Who; target?: Who }[]).map((v) => ({
       id: v.id,
-      voter_name: v.voter?.name || 'Desconhecido',
-      target_name: v.target?.name || 'Desconhecido',
+      voter_name: nameOf(v.voter),
+      target_name: nameOf(v.target),
       score: v.score,
       created_at: v.created_at,
     }));

@@ -108,6 +108,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-bg text-ink p-4 pb-28 max-w-md mx-auto flex flex-col gap-3">
       <AppHeader
         title="Dashboard"
+        pageHeading
         right={isAdmin ? (
           <>
             <AdminTag />

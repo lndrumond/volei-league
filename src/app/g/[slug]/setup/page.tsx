@@ -276,6 +276,7 @@ export default function Setup() {
     <div className="min-h-screen bg-bg text-ink p-4 pb-10 max-w-md mx-auto flex flex-col gap-3">
       <AppHeader
         title="Prancheta"
+        pageHeading
         right={<Button size="sm" inline onClick={() => router.push(`/g/${slug}`)} className="!min-h-9 !px-3 !py-1 !text-sm text-ink">Sair</Button>}
       />
       {children}

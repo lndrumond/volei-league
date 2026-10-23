@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/avlClient';
 import { groupRanking, MEDALS } from '@/lib/ranking';
@@ -26,47 +26,45 @@ const Spinner = () => (
 export default function RankingPage() {
   const { slug } = useParams() as { slug: string };
 
-  const [tab, setTab] = useState<Tab>('month');
+  // Link do Dashboard (?aba=mural) abre direto no mural.
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<Tab>(searchParams.get('aba') === 'mural' ? 'mural' : 'month');
   // Mês escolhido dentro do mural (AAAA-MM); null = lista de campeões
   const [picked, setPicked] = useState<string | null>(null);
 
-  const [rankings, setRankings] = useState<RankingItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  // Resultado da última busca, com a consulta que o gerou: se a consulta mudou, está carregando.
+  const [result, setResult] = useState<{ query: string; rankings: RankingItem[]; error: boolean } | null>(null);
 
   const [mural, setMural] = useState<MonthChampions[] | null>(null); // null = ainda não carregou
   const [muralError, setMuralError] = useState(false);
   const [showAllMural, setShowAllMural] = useState(false);
 
-  // Link do Dashboard (?aba=mural) abre direto no mural.
+  // O mural só é buscado na primeira vez que a aba é aberta (ou de novo, se deu erro e a aba foi tocada).
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('aba') === 'mural') setTab('mural');
-  }, []);
-
-  // O mural só é buscado na primeira vez que a aba é aberta.
-  useEffect(() => {
-    if (tab !== 'mural' || mural !== null) return;
-    setMuralError(false);
+    if (tab !== 'mural' || mural !== null || muralError) return;
     apiFetch(slug, `/api/rankings/champions?slug=${slug}`)
       .then((res) => res.json())
       .then((data) => setMural(data.champions || []))
       .catch((err) => { console.error(err); setMuralError(true); });
-  }, [slug, tab, mural]);
+  }, [slug, tab, mural, muralError]);
 
   // Ranking: mês atual, todos os tempos ou o mês escolhido no mural.
   const query = tab === 'month' ? 'period=month' : tab === 'all' ? 'period=all' : picked ? `month=${picked}` : null;
   useEffect(() => {
     if (!query) return;
-    setLoading(true);
-    setError(false);
+    let stale = false; // ignora a resposta se a pessoa já trocou de aba
     apiFetch(slug, `/api/rankings?slug=${slug}&${query}`)
       .then((res) => res.json())
-      .then((data) => setRankings(data.rankings || []))
-      .catch((err) => { console.error(err); setError(true); })
-      .finally(() => setLoading(false));
+      .then((data) => { if (!stale) setResult({ query, rankings: data.rankings || [], error: false }); })
+      .catch((err) => { console.error(err); if (!stale) setResult({ query, rankings: [], error: true }); });
+    return () => { stale = true; };
   }, [slug, query]);
 
-  const choose = (t: Tab) => { setTab(t); setPicked(null); };
+  const loading = !result || result.query !== query;
+  const error = !loading && result.error;
+  const rankings = loading ? [] : result.rankings;
+
+  const choose = (t: Tab) => { setTab(t); setPicked(null); if (t === 'mural') setMuralError(false); };
 
   const groups = groupRanking(rankings);
   const muralShown = mural ? (showAllMural ? mural : mural.slice(0, MURAL_VISIBLE)) : [];
