@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { apiFetch, PinModal, useAVLAuth, clearAuth } from '@/lib/avlClient';
 import { lineupNames, countSets } from '@/lib/teams';
 import { MEDALS, top5 } from '@/lib/ranking';
+import { addMonths, currentMonthKey, monthName } from '@/lib/brMonth';
 import { Button, Card, Chip, Eyebrow, Lineup, Scoreboard, Sub, useToast } from '@/components/ui';
 import AppHeader, { AdminTag } from '@/components/AppHeader';
 
@@ -33,6 +34,7 @@ export default function Dashboard() {
   const [lastSets, setLastSets] = useState<{ winner: string }[]>([]);
   const [playersMap, setPlayersMap] = useState<Record<string, string>>({});
   const [rankings, setRankings] = useState<RankingItem[]>([]);
+  const [lastMonthChamps, setLastMonthChamps] = useState<{ points: number; champions: { name: string }[] } | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [pinOpen, setPinOpen] = useState(false);
   const [afterPin, setAfterPin] = useState<() => void>(() => () => {});
@@ -41,10 +43,11 @@ export default function Dashboard() {
 
   const loadData = useCallback(async () => {
     try {
-      const [sessRes, rankRes, playRes] = await Promise.all([
+      const [sessRes, rankRes, playRes, champRes] = await Promise.all([
         apiFetch(slug, `/api/sessions/active?slug=${slug}`),
         apiFetch(slug, `/api/rankings?slug=${slug}&period=month`).catch(() => null),
         apiFetch(slug, `/api/players/list?slug=${slug}`).catch(() => null),
+        apiFetch(slug, `/api/rankings/champions?slug=${slug}`).catch(() => null),
       ]);
 
       if (playRes && playRes.ok) {
@@ -59,6 +62,12 @@ export default function Dashboard() {
         setLastEndedSession(sessData.lastEndedSession || null);
         setSessionSets(sessData.activeSession ? sessData.sets || [] : []);
         setLastSets(sessData.lastSets || []);
+      }
+      if (champRes && champRes.ok) {
+        const champData = await champRes.json();
+        // Honraria: campeão do mês passado (aparece já no dia 1º, horário de Brasília)
+        const prev = addMonths(currentMonthKey(), -1);
+        setLastMonthChamps((champData.champions || []).find((c: { month: string }) => c.month === prev) || null);
       }
       if (rankRes && rankRes.ok) {
         const rankData = await rankRes.json();
@@ -189,10 +198,25 @@ export default function Dashboard() {
         );
       })()}
 
+      {/* Honraria: campeão do mês passado */}
+      {lastMonthChamps && (
+        <Card slim className="!bg-gold">
+          <div className="flex items-center gap-3">
+            <span className="text-4xl" aria-hidden="true">🏆</span>
+            <div className="flex-1 min-w-0">
+              <Eyebrow className="!text-ink">Campeão de {monthName(addMonths(currentMonthKey(), -1))}</Eyebrow>
+              <p className="font-display font-bold text-xl leading-tight">{lastMonthChamps.champions.map((c) => c.name).join(' e ')}</p>
+              <p className="font-bold text-sm">{lastMonthChamps.points} pts no mês</p>
+            </div>
+            <Chip onClick={() => router.push(`/g/${slug}/ranking`)}>Mural</Chip>
+          </div>
+        </Card>
+      )}
+
       {/* Top 5 do mês: posições 1 a 5, empatados juntos e um embaixo do outro */}
       <Card slim>
         <div className="flex items-center gap-2">
-          <h2 className="flex-1 text-lg font-bold">Top 5 do mês</h2>
+          <h2 className="flex-1 text-lg font-bold">Top 5 de {monthName(currentMonthKey())}</h2>
           <Chip onClick={() => router.push(`/g/${slug}/ranking`)}>Ver tudo</Chip>
         </div>
         <div className="flex flex-col gap-2">

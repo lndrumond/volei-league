@@ -187,6 +187,15 @@ Objetivo: fixar como as telas funcionam antes de implementar. Não é o visual f
 - Ordem: Dashboard, Partida, Prancheta, Histórico, Ranking, Votação, Admin.
 - Prancheta é a mais complexa: **Opus 5.5**. Demais: **Sonnet 5.5**. Ajustes repetitivos de classe: **Haiku 5.5**.
 
+### B3.5. Mural dos Campeões ✅ (código; aguardando teste do dono)
+**Status: código pronto na branch `fase-a-etapa-a1` (22/10/2026). B3 foi aprovada "em partes" pelo dono, que mandou fazer esta etapa antes da B4. Sem deploy.**
+- **Decisões do dono:** o mês conta pela data do **set** (jogo lançado depois cai no mês do registro); a honraria do campeão aparece já no dia 1º; o mural mostra todos os meses (limitar só se ficar grande); sem filtro de fixo/visitante no ranking.
+- **Horário:** o mês é sempre o de Brasília (dia 1 às 00:00, UTC-3, sem horário de verão). O Top 5 já usava Brasília; não há "reset" a fazer, o mês muda sozinho. Novo `src/lib/brMonth.ts` (chave `AAAA-MM`, `monthKeyOf`, `addMonths`, nomes) e `src/lib/monthlyPoints.ts` (pontos por jogador por mês, com busca paginada de 1000 em 1000).
+- **API:** `/api/rankings` aceita `month=AAAA-MM` (além de `period=month|all`); nova `/api/rankings/champions` devolve um campeão (ou mais, em empate) por mês encerrado. Calculado na hora, sem tabela e sem mexer no banco.
+- **Telas:** Ranking ganha o bloco "Mural dos Campeões" (toque num mês mostra o ranking dele) e perde o filtro "Só Fixos"; Dashboard ganha o card dourado "Campeão de <mês passado>" acima do Top 5 e o título "Top 5 de <mês>".
+- **Verificado:** `tsc` sem erros; API conferida contra SQL de leitura no banco (7 meses, março a setembro; empate Cristiane e Diego em julho); Geral intacto (35 jogadores, 2200 pts); 9 casos de virada do mês (23:59 e 00:00 de Brasília, virada de ano); capturas do Ranking e do Dashboard em claro e escuro. Só leitura, nenhuma escrita no banco.
+- **Modelo sugerido:** Sonnet 5.5.
+
 ### B4. Revisão final
 - Celular real e computador, contraste, foco, `aria-label`, imagens.
 - **Modelo sugerido:** Opus 5.5.
@@ -224,6 +233,7 @@ Objetivo: fixar como as telas funcionam antes de implementar. Não é o visual f
 ---
 
 ## Histórico de alterações
+- **22/10/2026 (B3.5):** Mural dos Campeões no Ranking, honraria do campeão do mês passado e título do mês no Dashboard, ranking por mês escolhido, filtro Só Fixos removido. Mês em Brasília, pela data do set. Verificado por SQL de leitura e capturas. Commit local, sem deploy.
 - **22/10/2026 (B3, aba Votação):** a votação virou a 5ª aba da barra inferior, só para admin, apagada com cadeado até digitar a chave mestra; botão do Dashboard removido. Verificado em navegador sem interface: visitante vê 4 abas; admin com PIN vê 5 com cadeado; na página da votação a aba fica ativa; ao digitar a chave o cadeado some sem recarregar; visitante em `/super-admin` não vê barra. `tsc` sem erros. Commit local, sem deploy.
 - **22/10/2026 (B3, ajustes do dono):** setas na janela de mover, jogadores coloridos pelo time na prancheta, Último confronto permanece com partida ativa (API ajustada) e menu da votação com cadeado para o admin. `tsc` sem erros; capturas conferidas (chips coloridos, setas, menu com cadeado). Partida ativa com Último confronto não foi exercitada por exigir gravar no banco. Commit local, sem deploy.
 - **22/10/2026 (B3, código):** todas as telas migradas para o sistema visual; avisos no lugar dos `alert()`; rodapé global removido; `next.config.ts` com `NEXT_DIST_DIR`. `tsc` sem erros; capturas de tela conferidas. Placar do admin e passo 2 da prancheta só serão vistos em rodada real. Commits locais, sem push e sem deploy.

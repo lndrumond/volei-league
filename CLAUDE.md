@@ -64,7 +64,10 @@ O "Amigos do Vôlei" é um Web App voltado para o gerenciamento de quadras/jogos
 - **Empate:** mesma posição. Os empatados ficam agrupados numa posição só, um jogador embaixo do outro, em ordem alfabética. A posição seguinte pula (1, 1, 3).
 - **Medalhas:** 🥇🥈🥉 nas posições 1, 2 e 3, com destaque nos 3 primeiros, no Top 5 e no ranking Mês e Geral.
 - **Top 5 do Mês no Dashboard** é obrigatório: mostra as posições 1 a 5, com os empatados de cada posição, em ordem alfabética. Inclui fixos e visitantes. Sempre mostra as 5 posições. As posições 1 a 4 mostram todos os empatados. A 5ª mostra no máximo 3, com indicação de quantos ficaram de fora.
-- Filtros "Todo Mundo" e "Só Fixos" aplicados no front.
+- Sem filtro de fixos e visitantes: o ranking mostra todo mundo (visitante com etiqueta). O filtro "Só Fixos" foi removido.
+- **Mural dos Campeões** (topo do Ranking): um campeão por mês já encerrado, do mais recente ao mais antigo (hoje mostra todos; se crescer demais, limita e usa "Ver todos"). Empate no 1º lugar: todos os empatados são campeões, em ordem alfabética. Mês sem jogo não aparece; o mês atual ainda não tem campeão. Tocar num mês abre o ranking completo dele.
+- **Campeão do mês passado no Dashboard:** card de honraria dourado acima do Top 5, já no dia 1º do mês (Brasília). O título do Top 5 traz o nome do mês ("Top 5 de outubro").
+- **Mês = horário de Brasília** (dia 1 às 00:00, UTC-3). Não existe "reset": o mês muda sozinho porque é só um filtro por data. O mês de cada ponto é o da data do **set**: jogo lançado depois conta no mês do registro. O mural é calculado na hora (sem tabela), então corrige sozinho.
 
 ## Histórico (`/g/[slug]/history`, "Baú de Resenhas")
 - Lista rodadas (o dia). Cada rodada com 2 partidas ou menos mostra as partidas abertas.
@@ -111,6 +114,9 @@ O "Amigos do Vôlei" é um Web App voltado para o gerenciamento de quadras/jogos
 - **Validação de times no servidor:** `setup-teams` hoje grava as listas sem checar. Falta recusar jogador repetido ou em dois times, e passar de 7 por time (etapa A2).
 
 ## Registro de Atualizações
+### [22/10/2026] - Fase B3.5 (Mural dos Campeões)
+- `/api/rankings?month=AAAA-MM` e `/api/rankings/champions`; mural no Ranking, honraria do mês passado e título do mês no Dashboard; filtro Só Fixos removido. Meses em Brasília (`src/lib/brMonth.ts`, `src/lib/monthlyPoints.ts`). Sem tabela nova. Sem deploy.
+
 ### [22/10/2026] - Fase B3 (telas no novo visual)
 - Dashboard, Partida, Prancheta, Histórico, Ranking, Votação e Super Admin usam os componentes e tokens da Fase B. Avisos (`useToast`) no lugar de `alert()`. Rodapé global removido (o crédito ficou no fim do Dashboard). Sem deploy.
 
