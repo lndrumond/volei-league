@@ -208,7 +208,7 @@ export default function Dashboard() {
               <p className="font-display font-bold text-xl leading-tight">{lastMonthChamps.champions.map((c) => c.name).join(' e ')}</p>
               <p className="font-bold text-sm">{lastMonthChamps.points} pts no mês</p>
             </div>
-            <Chip onClick={() => router.push(`/g/${slug}/ranking`)}>Mural</Chip>
+            <Chip onClick={() => router.push(`/g/${slug}/ranking?aba=mural`)}>Mural</Chip>
           </div>
         </Card>
       )}

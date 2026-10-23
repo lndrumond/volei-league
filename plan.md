@@ -194,6 +194,7 @@ Objetivo: fixar como as telas funcionam antes de implementar. Não é o visual f
 - **API:** `/api/rankings` aceita `month=AAAA-MM` (além de `period=month|all`); nova `/api/rankings/champions` devolve um campeão (ou mais, em empate) por mês encerrado. Calculado na hora, sem tabela e sem mexer no banco.
 - **Telas:** Ranking ganha o bloco "Mural dos Campeões" (toque num mês mostra o ranking dele) e perde o filtro "Só Fixos"; Dashboard ganha o card dourado "Campeão de <mês passado>" acima do Top 5 e o título "Top 5 de <mês>".
 - **Verificado:** `tsc` sem erros; API conferida contra SQL de leitura no banco (7 meses, março a setembro; empate Cristiane e Diego em julho); Geral intacto (35 jogadores, 2200 pts); 9 casos de virada do mês (23:59 e 00:00 de Brasília, virada de ano); capturas do Ranking e do Dashboard em claro e escuro. Só leitura, nenhuma escrita no banco.
+- **Ajuste pedido pelo dono (22/10/2026):** o Ranking virou três abas com emoji: 📅 Mês atual, ♾️ Todos os tempos (novo nome do "Geral") e 🏆 Mural dos Campeões. O mural deixou de ficar no topo e só carrega ao abrir a aba; tocar num mês mostra o ranking dele com "← Voltar ao mural". O botão "Mural" do Dashboard abre direto a aba (`?aba=mural`). Verificado por capturas e cliques (mural não é chamado ao abrir a página; 7 meses; julho com empate; voltar). Um erro achado no teste (título do mês com mês ainda não escolhido) foi corrigido.
 - **Modelo sugerido:** Sonnet 5.5.
 
 ### B4. Revisão final
@@ -233,6 +234,7 @@ Objetivo: fixar como as telas funcionam antes de implementar. Não é o visual f
 ---
 
 ## Histórico de alterações
+- **22/10/2026 (B3.5, ajuste):** Ranking em três abas com emoji (Mês atual, Todos os tempos, Mural dos Campeões), mural carregado só ao abrir; botão do Dashboard abre o mural. Commit local, sem deploy.
 - **22/10/2026 (B3.5):** Mural dos Campeões no Ranking, honraria do campeão do mês passado e título do mês no Dashboard, ranking por mês escolhido, filtro Só Fixos removido. Mês em Brasília, pela data do set. Verificado por SQL de leitura e capturas. Commit local, sem deploy.
 - **22/10/2026 (B3, aba Votação):** a votação virou a 5ª aba da barra inferior, só para admin, apagada com cadeado até digitar a chave mestra; botão do Dashboard removido. Verificado em navegador sem interface: visitante vê 4 abas; admin com PIN vê 5 com cadeado; na página da votação a aba fica ativa; ao digitar a chave o cadeado some sem recarregar; visitante em `/super-admin` não vê barra. `tsc` sem erros. Commit local, sem deploy.
 - **22/10/2026 (B3, ajustes do dono):** setas na janela de mover, jogadores coloridos pelo time na prancheta, Último confronto permanece com partida ativa (API ajustada) e menu da votação com cadeado para o admin. `tsc` sem erros; capturas conferidas (chips coloridos, setas, menu com cadeado). Partida ativa com Último confronto não foi exercitada por exigir gravar no banco. Commit local, sem deploy.
