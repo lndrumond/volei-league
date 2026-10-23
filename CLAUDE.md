@@ -10,6 +10,7 @@ O "Amigos do Vôlei" é um Web App voltado para o gerenciamento de quadras/jogos
 - **UI:** Estilo "Bubbly" / Botões de Fliperama (bordas grossas, cantos muito arredondados, cores vibrantes). Em redesenho: paleta descontraída e esportiva, com tom de app de respeito (ver `plan.md`).
 - **Usuários:** pessoas com pouca familiaridade digital. Mínimo de cliques, botões grandes, ação principal clara por tela.
 - **Uso:** celular para todos; computador só para o admin.
+- **Placar e times:** placar de sets em caixas com a cor de cada time e o X no meio; a escalação de cada time tem uma faixa na cor dele, e os dois quadros ficam do mesmo tamanho (troféu na faixa de quem venceu). Títulos têm cor própria (azul-mar no claro, amarelo-sol no escuro). Honraria do campeão em amarelo-sol.
 - **Imagens:** as telas usam versões leves (`public/logo-header.png`, `icon-*.png`, `apple-icon.png`) geradas por `node scripts/gerar-imagens.mjs` a partir de `public/logo.png` e `public/bola.png`. Trocou a logo ou a bola: rodar o script de novo.
 - **Acessibilidade:** cores com contraste AA (no escuro, o contorno é azul-acinzentado e a sombra tem token próprio, `--shadow`); foco sempre visível; toda tela tem `h1` (visível ou só para leitor de tela, via `AppHeader pageHeading`) e o próprio nome na aba do navegador (`layout.tsx` da rota).
 

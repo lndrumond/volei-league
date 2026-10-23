@@ -395,11 +395,11 @@ export default function Setup() {
             <Sub>Toque no nome de um jogador para trocar de time ou mandar para o banco.</Sub>
             <div className="grid grid-cols-2 gap-2.5">
               <div className="min-w-0">
-                <h3 className="font-display font-bold text-[15px] mb-1.5"><TeamDot side="champion" />{CHAMPION_NAME}</h3>
+                <h3 className="font-display font-bold text-[15px] mb-1.5 px-2.5 py-1 rounded-[12px] border-[3px] border-line bg-sea !text-sea-ink truncate">{CHAMPION_NAME}</h3>
                 <ul className="flex flex-col gap-1.5">{orderedWithCaptain(champIds, champCap).map((id) => teamRow(id, id === champCap, 'champion'))}</ul>
               </div>
               <div className="min-w-0">
-                <h3 className="font-display font-bold text-[15px] mb-1.5"><TeamDot side="challenger" />{CHALLENGER_NAME}</h3>
+                <h3 className="font-display font-bold text-[15px] mb-1.5 px-2.5 py-1 rounded-[12px] border-[3px] border-line bg-vest !text-vest-ink truncate">{CHALLENGER_NAME}</h3>
                 <ul className="flex flex-col gap-1.5">{orderedWithCaptain(challIds, challCap).map((id) => teamRow(id, id === challCap, 'challenger'))}</ul>
               </div>
             </div>

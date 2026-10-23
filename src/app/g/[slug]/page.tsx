@@ -184,16 +184,10 @@ export default function Dashboard() {
         return (
           <Card slim>
             <Eyebrow>Último confronto · {formatWhen(lastShown.created_at, lastShown.ended_at)}</Eyebrow>
+            <Scoreboard a={a} b={b} names={false} />
             <div className="grid grid-cols-2 gap-2.5">
-              {([
-                { side: 'champion', n: a, win: a > b, list: lineupNames(lastShown.champion_name, lastShown.champion_player_ids, playersMap) },
-                { side: 'challenger', n: b, win: b > a, list: lineupNames(lastShown.challenger_name, lastShown.challenger_player_ids, playersMap) },
-              ] as const).map((t) => (
-                <div key={t.side} className="flex flex-col gap-1.5">
-                  <div className="font-display font-bold text-4xl leading-none text-center tabular-nums" aria-label={`${t.n} sets`}>{t.n}</div>
-                  <Lineup side={t.side} players={t.list} win={t.win} />
-                </div>
-              ))}
+              <Lineup side="champion" players={lineupNames(lastShown.champion_name, lastShown.champion_player_ids, playersMap)} win={a > b} />
+              <Lineup side="challenger" players={lineupNames(lastShown.challenger_name, lastShown.challenger_player_ids, playersMap)} win={b > a} />
             </div>
           </Card>
         );
@@ -201,12 +195,14 @@ export default function Dashboard() {
 
       {/* Honraria: campeão do mês passado */}
       {lastMonthChamps && (
-        <Card slim className="!bg-gold">
-          <div className="flex items-center gap-3">
-            <span className="text-4xl" aria-hidden="true">🏆</span>
+        <Card slim className="!bg-sun !text-sun-ink relative overflow-hidden">
+          {/* brilho de troféu no canto */}
+          <span aria-hidden="true" className="pointer-events-none absolute -right-6 -top-8 w-28 h-28 rounded-full bg-white/35" />
+          <p className="relative font-extrabold text-xs tracking-[0.08em] uppercase">👑 Campeão de {monthName(addMonths(currentMonthKey(), -1))}</p>
+          <div className="relative flex items-center gap-3">
+            <span className="text-5xl drop-shadow-[0_3px_0_rgba(15,42,67,0.35)]" aria-hidden="true">🏆</span>
             <div className="flex-1 min-w-0">
-              <Eyebrow className="!text-ink">Campeão de {monthName(addMonths(currentMonthKey(), -1))}</Eyebrow>
-              <p className="font-display font-bold text-xl leading-tight">{lastMonthChamps.champions.map((c) => c.name).join(' e ')}</p>
+              <p className="font-display font-bold text-2xl leading-tight break-words">{lastMonthChamps.champions.map((c) => c.name).join(' e ')}</p>
               <p className="font-bold text-sm">{lastMonthChamps.points} pts no mês</p>
             </div>
             <Chip onClick={() => router.push(`/g/${slug}/ranking?aba=mural`)}>Mural</Chip>
@@ -233,7 +229,7 @@ export default function Dashboard() {
                 {g.shown.map((p, i) => (
                   <li key={`${p.name}-${i}`} className="min-h-7 flex items-center">
                     {p.name}
-                    {p.is_guest && <small className="ml-1.5 text-[13px] font-bold text-muted">visitante</small>}
+                    {p.is_guest && <small className={`ml-1.5 text-[13px] font-bold ${g.position <= 3 ? 'text-ink' : 'text-muted'}`}>visitante</small>}
                   </li>
                 ))}
                 {g.more > 0 && <li className="text-[13px] font-bold text-muted">+{g.more} no mesmo placar</li>}

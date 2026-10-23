@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import { apiFetch } from '@/lib/avlClient';
 import { lineupNames } from '@/lib/teams';
-import { Card, Chip, EmptyState, Lineup, Sub } from '@/components/ui';
+import { Card, Chip, EmptyState, Lineup, Scoreboard, Sub } from '@/components/ui';
 import AppHeader from '@/components/AppHeader';
 
 interface Match {
@@ -99,9 +99,7 @@ export default function HistoryPage() {
           <span className="text-xs font-bold text-muted">{hour(m.created_at)}{m.ended_at ? ` às ${hour(m.ended_at)}` : ''}</span>
         </div>
         {m.description && <p className="font-extrabold text-sm break-words">{m.description}</p>}
-        <div className="font-display font-bold text-4xl text-center tabular-nums leading-none" aria-label={`${a} a ${b}`}>
-          {a}<span className="text-xl text-muted"> x </span>{b}
-        </div>
+        <Scoreboard a={a} b={b} names={false} />
         <div className="grid grid-cols-2 gap-2.5">
           <Lineup side="champion" players={champ} win={a > b} />
           <Lineup side="challenger" players={chall} win={b > a} />
@@ -155,7 +153,7 @@ export default function HistoryPage() {
             return (
               <details key={r.day} open={n <= 2} className="group">
                 <summary className="flex items-center justify-between gap-3 bg-surface text-ink border-[3px] border-line rounded-card shadow-pop px-4 py-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden min-h-14">
-                  <h2 className="text-lg font-bold capitalize">{r.day === todayKey ? 'Hoje · ' : ''}{dayLabel(r.day)}</h2>
+                  <h2 className="text-lg font-bold first-letter:uppercase">{r.day === todayKey ? 'Hoje · ' : ''}{dayLabel(r.day)}</h2>
                   <span className="flex items-center gap-2.5 shrink-0">
                     <span className="font-extrabold text-sm text-muted">{n} {n === 1 ? 'partida' : 'partidas'}</span>
                     <span aria-hidden="true" className="text-muted transition-transform group-open:rotate-180">▼</span>

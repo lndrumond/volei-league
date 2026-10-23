@@ -148,7 +148,7 @@ export default function RankingPage() {
                     {g.players.map((p, i) => (
                       <li key={`${p.name}-${i}`} className="min-h-9 flex items-center flex-wrap gap-x-2">
                         {p.name}
-                        {p.is_guest && <small className="text-[13px] font-bold text-muted">visitante</small>}
+                        {p.is_guest && <small className={`text-[13px] font-bold ${g.position <= 3 ? 'text-ink' : 'text-muted'}`}>visitante</small>}
                       </li>
                     ))}
                   </ul>

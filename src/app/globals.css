@@ -27,9 +27,12 @@
   --ok: #16774B;
 
   /* medalhas: ouro, prata, bronze (fundos suaves) */
-  --gold: #FFEDB0;
-  --silver: #DCE8F1;
-  --bronze: #F8DCC2;
+  --gold: #FFD95A;
+  --silver: #C5D3DE;
+  --bronze: #F0BE8E;
+
+  /* títulos com cor própria (não o mesmo tom do texto) */
+  --title: #0E5E91;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -52,9 +55,10 @@
     --danger: #F06A6A;
     --danger-ink: #2A0505;
     --ok: #4CC58C;
-    --gold: #5A4A12;
-    --silver: #34495C;
-    --bronze: #5A3A20;
+    --gold: #7A5E0C;
+    --silver: #4A6075;
+    --bronze: #7A4B22;
+    --title: #FFC83D;
     color-scheme: dark;
   }
 }
@@ -77,9 +81,10 @@
   --danger: #F06A6A;
   --danger-ink: #2A0505;
   --ok: #4CC58C;
-  --gold: #5A4A12;
-  --silver: #34495C;
-  --bronze: #5A3A20;
+  --gold: #7A5E0C;
+  --silver: #4A6075;
+  --bronze: #7A4B22;
+  --title: #FFC83D;
   color-scheme: dark;
 }
 
@@ -104,6 +109,7 @@
   --color-gold: var(--gold);
   --color-silver: var(--silver);
   --color-bronze: var(--bronze);
+  --color-title: var(--title);
 
   --font-display: var(--font-fredoka), 'Trebuchet MS', system-ui, sans-serif;
   --font-body: var(--font-nunito), system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -125,6 +131,7 @@ body {
 
 h1, h2, h3 {
   font-family: var(--font-display);
+  color: var(--title);
   text-wrap: balance;
 }
 
