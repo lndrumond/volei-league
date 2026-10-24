@@ -15,7 +15,9 @@ const MEDAL_BG = ['bg-gold', 'bg-silver', 'bg-bronze'];
 // Quantos meses o mural mostra de início; os mais antigos ficam atrás de "Ver todos".
 const MURAL_VISIBLE = 12;
 
-type Tab = 'month' | 'all' | 'mural';
+type Tab = 'month' | 'all' | 'fominha' | 'mural';
+// Escopo da aba Fominha: mês atual ou todos os tempos.
+type Scope = 'month' | 'all';
 
 const Spinner = () => (
   <div className="text-center py-12">
@@ -28,7 +30,12 @@ export default function RankingPage() {
 
   // Link do Dashboard (?aba=mural) abre direto no mural.
   const searchParams = useSearchParams();
-  const [tab, setTab] = useState<Tab>(searchParams.get('aba') === 'mural' ? 'mural' : 'month');
+  // Links dos cards do Dashboard: ?aba=mes|todos|fominha|mural e ?escopo=mes|todos (fominha).
+  const abaParam = searchParams.get('aba');
+  const [tab, setTab] = useState<Tab>(
+    abaParam === 'mural' ? 'mural' : abaParam === 'todos' ? 'all' : abaParam === 'fominha' ? 'fominha' : 'month',
+  );
+  const [scope, setScope] = useState<Scope>(searchParams.get('escopo') === 'todos' ? 'all' : 'month');
   // Mês escolhido dentro do mural (AAAA-MM); null = lista de campeões
   const [picked, setPicked] = useState<string | null>(null);
 
@@ -48,8 +55,12 @@ export default function RankingPage() {
       .catch((err) => { console.error(err); setMuralError(true); });
   }, [slug, tab, mural, muralError]);
 
-  // Ranking: mês atual, todos os tempos ou o mês escolhido no mural.
-  const query = tab === 'month' ? 'period=month' : tab === 'all' ? 'period=all' : picked ? `month=${picked}` : null;
+  // Ranking: mês atual, todos os tempos, fominha (no escopo escolhido) ou o mês escolhido no mural.
+  const query =
+    tab === 'month' ? 'period=month'
+    : tab === 'all' ? 'period=all'
+    : tab === 'fominha' ? `metric=fominha&period=${scope === 'month' ? 'month' : 'all'}`
+    : picked ? `month=${picked}` : null;
   useEffect(() => {
     if (!query) return;
     let stale = false; // ignora a resposta se a pessoa já trocou de aba
@@ -71,7 +82,8 @@ export default function RankingPage() {
   const showingMuralList = tab === 'mural' && !picked;
   // Na lista do mural ainda não há mês escolhido, então o título só vale fora dela.
   const month = tab === 'month' ? currentMonthKey() : picked;
-  const heading = tab === 'all' ? '♾️ Todos os tempos' : month ? monthLabel(month) : '';
+  const isFominha = tab === 'fominha';
+  const heading = tab === 'all' || (isFominha && scope === 'all') ? '♾️ Todos os tempos' : month ? monthLabel(month) : isFominha ? monthLabel(currentMonthKey()) : '';
 
   return (
     <div className="min-h-screen bg-bg text-ink p-4 pb-28 max-w-md mx-auto flex flex-col gap-3">
@@ -81,6 +93,7 @@ export default function RankingPage() {
       <div className="flex flex-wrap gap-2" role="group" aria-label="Tipo de ranking">
         <Chip pressed={tab === 'month'} onClick={() => choose('month')}>📅 Mês atual</Chip>
         <Chip pressed={tab === 'all'} onClick={() => choose('all')}>♾️ Todos os tempos</Chip>
+        <Chip pressed={tab === 'fominha'} onClick={() => choose('fominha')}>🏐 Fominha</Chip>
         <Chip pressed={tab === 'mural'} onClick={() => choose('mural')}>🏆 Mural dos Campeões</Chip>
       </div>
 
@@ -125,15 +138,25 @@ export default function RankingPage() {
               <Chip onClick={() => setPicked(null)}>← Voltar ao mural</Chip>
             </div>
           )}
+          {isFominha && (
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Período da fominha">
+              <Chip pressed={scope === 'month'} onClick={() => setScope('month')}>Mês atual</Chip>
+              <Chip pressed={scope === 'all'} onClick={() => setScope('all')}>Todos os tempos</Chip>
+            </div>
+          )}
           <h2 className="text-lg font-bold first-letter:uppercase">{heading}</h2>
-          <Sub>Cada set ganho vale +1 ponto para cada jogador do time vencedor. Empatados dividem a posição e ficam um embaixo do outro, em ordem alfabética.</Sub>
+          {isFominha ? (
+            <Sub>Conta a quantidade de partidas jogadas, não de dias. Partida é um confronto entre dois times, e cada uma em que a pessoa foi escalada conta 1 (com ou sem set anotado). Um dia pode ter várias partidas, por exemplo quando há troca de times. Empatados dividem a posição e ficam um embaixo do outro, em ordem alfabética.</Sub>
+          ) : (
+            <Sub>Cada set ganho vale +1 ponto para cada jogador do time vencedor. Empatados dividem a posição e ficam um embaixo do outro, em ordem alfabética.</Sub>
+          )}
 
           {loading ? (
             <Spinner />
           ) : error ? (
             <p role="alert" className="bg-danger text-danger-ink border-[3px] border-line rounded-[16px] px-4 py-3 font-bold text-center">Erro ao buscar o ranking.</p>
           ) : groups.length === 0 ? (
-            <EmptyState icon="🌬️" title="A quadra tá vazia!" text="Ninguém marcou ponto ainda. 🏐" />
+            <EmptyState icon="🌬️" title="A quadra tá vazia!" text={isFominha ? 'Ninguém entrou em quadra ainda. 🏐' : 'Ninguém marcou ponto ainda. 🏐'} />
           ) : (
             <Card slim className="gap-2">
               {groups.map((g) => (
@@ -152,7 +175,9 @@ export default function RankingPage() {
                       </li>
                     ))}
                   </ul>
-                  <span className="font-display font-bold pt-1.5 shrink-0">{g.points} pts</span>
+                  <span className="font-display font-bold pt-1.5 shrink-0">
+                    {isFominha ? `${g.points} ${g.points === 1 ? 'partida' : 'partidas'}` : `${g.points} pts`}
+                  </span>
                 </div>
               ))}
             </Card>

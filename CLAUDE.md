@@ -68,6 +68,7 @@ O "Amigos do Vôlei" é um Web App voltado para o gerenciamento de quadras/jogos
 - **Medalhas:** 🥇🥈🥉 nas posições 1, 2 e 3, com destaque nos 3 primeiros, no Top 5 e no ranking Mês e Geral.
 - **Top 5 do Mês no Dashboard** é obrigatório: mostra as posições 1 a 5, com os empatados de cada posição, em ordem alfabética. Inclui fixos e visitantes. Sempre mostra as 5 posições. As posições 1 a 4 mostram todos os empatados. A 5ª mostra no máximo 3, com indicação de quantos ficaram de fora.
 - Sem filtro de fixos e visitantes: o ranking mostra todo mundo (visitante com etiqueta). O filtro "Só Fixos" foi removido.
+- **Fominha (presença):** conta **partidas jogadas**, não dias. Partida é um confronto entre dois times (`sessions`); cada partida em que o jogador foi escalado num time (champion ou challenger) conta 1, com ou sem set anotado. Um dia pode ter várias partidas (troca de time). Não altera a pontuação, que continua só por set. Mês pela data da partida. Aparece na aba Fominha do Ranking (mês atual ou todos os tempos) e no card "Maior Fominha" do Dashboard (só o primeiro lugar).
 - **Abas do Ranking** (chips com emoji): **📅 Mês atual**, **♾️ Todos os tempos** (o antigo "Geral") e **🏆 Mural dos Campeões**. O mural só é buscado quando a aba é aberta.
 - **Mural dos Campeões:** um campeão por mês já encerrado, do mais recente ao mais antigo (hoje mostra todos; se crescer demais, limita e usa "Ver todos"). Empate no 1º lugar: todos os empatados são campeões, em ordem alfabética. Mês sem jogo não aparece; o mês atual ainda não tem campeão. Tocar num mês abre o ranking completo dele, com o botão "← Voltar ao mural". O botão "Mural" do card do Dashboard abre direto esta aba (`?aba=mural`).
 - **Campeão do mês passado no Dashboard:** card de honraria dourado acima do Top 5, já no dia 1º do mês (Brasília). O título do Top 5 traz o nome do mês ("Top 5 de outubro").
@@ -118,6 +119,9 @@ O "Amigos do Vôlei" é um Web App voltado para o gerenciamento de quadras/jogos
 - **Validação de times no servidor:** `setup-teams` hoje grava as listas sem checar. Falta recusar jogador repetido ou em dois times, e passar de 7 por time (etapa A2).
 
 ## Registro de Atualizações
+### [22/10/2026] - Fase D2 (Fominha) em produção
+- Ranking de fominha por partidas escaladas (aba Fominha e card Maior Fominha no Dashboard), com a regra acima. Campo `metric=fominha` em `/api/rankings`. Autorizado pelo dono e publicado na `main`.
+
 ### [22/10/2026] - Etapa A7 (deploy em produção)
 - Fases A e B publicadas na `main` e na Vercel (https://volei-league.vercel.app), com `AUTH_TOKEN_SECRET` cadastrada pelo dono. Conferido em produção. Admins digitam o PIN de novo uma vez.
 
