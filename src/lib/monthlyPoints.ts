@@ -6,6 +6,7 @@ export interface PlayerLite { id: string; name: string; is_guest: boolean | null
 /**
  * Pontos de cada jogador por mês (horário de Brasília). Cada set ganho vale +1 para cada jogador do time vencedor.
  * O mês é o da data do set (ou da partida, se o set não tiver data): jogo registrado depois conta no mês do registro.
+ * Fominha: partidas em que o jogador foi escalado (num time), por mês da partida. Não depende de set anotado.
  */
 export async function loadMonthlyPoints(groupId: string) {
   const { data: players, error: pErr } = await supabase.from('players').select('id, name, is_guest').eq('group_id', groupId);
@@ -28,6 +29,7 @@ export async function loadMonthlyPoints(groupId: string) {
   }
 
   const byMonth = new Map<string, Record<string, number>>();
+  const gamesByMonth = new Map<string, Record<string, number>>();
   const known = new Set((players || []).map((p) => p.id));
 
   for (const s of sessions) {
@@ -41,7 +43,15 @@ export async function loadMonthlyPoints(groupId: string) {
       }
       byMonth.set(key, pts);
     }
+
+    // Uma partida conta 1 para cada jogador escalado num dos times (um jogador só conta uma vez por partida).
+    const gameKey = monthKeyOf(s.created_at);
+    const games = gamesByMonth.get(gameKey) || {};
+    for (const id of new Set([...champ, ...chall])) {
+      if (known.has(id)) games[id] = (games[id] || 0) + 1;
+    }
+    gamesByMonth.set(gameKey, games);
   }
 
-  return { players: (players || []) as PlayerLite[], byMonth };
+  return { players: (players || []) as PlayerLite[], byMonth, gamesByMonth };
 }

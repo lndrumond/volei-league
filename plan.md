@@ -220,7 +220,7 @@ Objetivo: fixar como as telas funcionam antes de implementar. Não é o visual f
 
 ## Fase C: Novidades 2.0 e analytics
 
-**Status: planejada e aprovada pelo dono em 22/10/2026. C1 revisada e aprovada pelo dono. C2 feita no código (branch `fase-c-novidades`, sem commit e sem deploy), aguardando teste do dono no navegador antes da C3.**
+**Status: concluída e publicada em 22/10/2026 (commit `32100c9` na `main`). Dono testou em produção: analytics funcionando, popup funcionando. Tela de abertura do app instalado aceita como está (aparece branca com a bola antes de ficar azul; não incomoda).**
 
 Etapas, uma por vez (C1 só começa depois da aprovação do dono):
 
@@ -241,6 +241,40 @@ Etapas, uma por vez (C1 só começa depois da aprovação do dono):
 - Botão: "Bora jogar!"
 
 **Fora deste ciclo:** "Quantos online agora" (sem Supabase Presence, sem Upstash e sem Ably). Pode voltar depois, com decisão própria.
+
+---
+
+## Fase D: Campeão Geral e Fominha
+
+**Status: D1 aprovada pelo dono. D2 feita no código (aguarda teste do dono no navegador). D3 depois. Vulnerabilidade do Next.js fica para mais adiante, por ser mudança grande.**
+
+Etapas, uma por vez:
+
+- **D1, Campeão Geral (honraria de todos os tempos):**
+  - Card no Dashboard, **acima** do card de campeão do mês, com separação visual para não tirar o brilho dele.
+  - Título e nome em uma constante só no código, para trocar fácil (padrão: "Campeão Geral"). Título neutro, sem gênero.
+  - Calculado na hora a partir dos sets (sem tabela). Empate no topo: todos os empatados aparecem, em ordem alfabética.
+  - Mostra o critério em uma linha ("192 sets ganhos, o maior número de todos os tempos") e a diferença para o 2º ("+1 sobre Andrea").
+  - Coroa 👑 exclusiva do Campeão Geral. **Sai do card de campeão do mês**, que fica só com o troféu.
+  - Tratamento mais forte que o do mês (borda mais grossa, sombra e coroa grande), sem repetir a cor do troféu.
+- **D2, Ranking de Fominha (presença):**
+  - Conta **por partida**, não por rodada: quem foi escalado num time (champion ou challenger) numa partida conta 1. Partidas sem set anotado também contam.
+  - Não usa a lista de presentes, porque ela não registra quem saiu no meio e inclui quem ficou no banco de areia.
+  - Visitantes entram, com etiqueta, como no ranking de pontos.
+  - Não altera a pontuação (que continua só por set). Registrar a regra no `CLAUDE.md` ao aprovar.
+  - Mostra os 3 primeiros, com filtro Mês / Todos os tempos, seguindo o padrão do Ranking (empate na mesma posição, medalhas 🥇🥈🥉).
+  - Aparece em dois lugares, no mesmo formato: na aba do Ranking e como card "Top Fominha" no Dashboard (3 primeiros).
+  - Exemplo de dados atuais (todos os tempos): Andrea 74, Mauricio 70, Rita 69, Cristiane 65, Ti Lu 65.
+  - Diferença para a lista de presentes: Andrea tem 76 na lista de presentes e 74 escaladas. As 2 a mais são: uma rodada de 06/09 (presente, fora dos times, com 3 sets) e a rodada de 22/10 (encerrada sem times e sem sets). Por isso a regra usa escalação, não a lista de presentes.
+- **D3, Revisão visual:** o dono confere o card do Campeão Geral e o ranking de fominha no celular antes de publicar. Deploy só com autorização.
+
+**Decisões já tomadas pelo dono:**
+- Nome da honraria: **"Lenda da Areia"**, com a descrição "Mais sets ganhos de todos os tempos" (fácil de trocar no código, numa constante só).
+- Ranking de fominha: aba nova na página do Ranking, com a lista completa e a quantidade de partidas de cada pessoa (sem porcentagem). Mês atual e Todos os tempos.
+- Dashboard, em ordem: (1) card **Lenda da Areia** (maior vencedor de todos os tempos); (2) card **campeão do mês** (só troféu); (3) card **Maior Fominha** (só o primeiro, com a contagem de partidas). **O card Top 5 não muda nesta fase** (fica como está, sem abas). Ficou para decidir depois, se fizer sentido.
+- Escopo desta fase: (a) registro de presença no Ranking (aba Fominha, com lista, partidas e frequência); (b) honraria de maior fominha no Dashboard, junto com a Lenda da Areia.
+- Fominha: por partida, escalação num time, com visitantes.
+- Vulnerabilidade do Next.js: fica para depois, em etapa própria.
 
 ---
 
@@ -275,6 +309,15 @@ Etapas, uma por vez (C1 só começa depois da aprovação do dono):
 ---
 
 ## Histórico de alterações
+- **22/10/2026 (D2, ajuste 2 do dono):** cards de honraria compactados para o Dashboard rolar menos: altura mínima removida, ícone text-3xl, nome text-lg, brilho menor. Os três cards ficam pelo conteúdo, sem altura fixa. `tsc` e eslint sem erros. Nenhum commit ou deploy.
+- **22/10/2026 (D2, ajuste do dono):** botão "Ver ranking" nos três cards de honraria (Lenda → Todos os tempos, Campeão do mês → Mural, Maior Fominha → Fominha de todos os tempos). A aba do Ranking aceita `?aba=` e `?escopo=`. Os três cards têm a mesma altura mínima (classe `HONRA_CARD`). Cor da Maior Fominha trocada de marrom para verde (token `ok`). `tsc` e eslint sem erros. Nenhum commit ou deploy.
+- **22/10/2026 (D2, código):** fominha por partida escalada (champion ou challenger, com ou sem set; um jogador conta 1 por partida), por mês da data da partida. Carga em `src/lib/monthlyPoints.ts` (`gamesByMonth`); `/api/rankings?metric=fominha` (no campo `points` vai a quantidade de partidas). Aba "🏐 Fominha" no Ranking, com escopo Mês atual / Todos os tempos e lista completa. Card "Maior Fominha" no Dashboard, depois do campeão do mês (só o primeiro, empatados juntos). Conferido no banco (só SELECT): Andrea 74, Mauricio 70, Rita 69, Cristiane 65, Ti Lu 65, iguais ao plano. `tsc` e eslint sem erros. Nenhum commit ou deploy. Falta teste do dono no navegador. Regra a registrar no `CLAUDE.md` ao aprovar.
+- **22/10/2026 (D1 aprovada pelo dono):** Lenda da Areia aprovada, para seguir para a D2.
+- **22/10/2026 (D1, ajuste 2 do dono):** card Lenda compactado. Linhas: nome, "N sets ganhos", "Maior sets ganhos de todos os tempos". Altura mínima fixa removida nos dois cards de honraria; ícones e nomes reduzidos (text-4xl e text-xl) para economizar espaço. `tsc` e lint sem erros.
+- **22/10/2026 (D1, ajuste do dono):** removida a linha "+N sobre" do card Lenda da Areia. Sets ganhos e pts no mês viraram informação embaixo do nome, sem negrito. Os dois cards de honraria (Lenda e campeão do mês) recebem a mesma altura mínima. `tsc` e lint sem erros; altura conferida só no navegador pelo dono.
+- **22/10/2026 (D1, código):** card "Lenda da Areia" no Dashboard (maior vencedor de todos os tempos, em sets ganhos, com a diferença para o 2º), acima do campeão do mês. Coroa 👑 saiu do card do mês. Dados vêm de `/api/rankings?period=all`, sem endpoint novo. `tsc`, lint e `next build` sem erros. Falta teste do dono no navegador. Nenhum commit ou deploy. D2 (aba Fominha e card Maior Fominha) aguarda aprovação da D1.
+- **22/10/2026 (Fase D planejada):** Campeão Geral (honraria de todos os tempos, com coroa, card acima do mês) e Ranking de Fominha (contagem por partida escalada num time). Planejamento só; nenhum código. Leitura de banco feita para os números de exemplo (só SELECT).
+- **22/10/2026 (Fase C concluída):** dono testou em produção. Analytics da Vercel funcionando, popup de novidades funcionando, tela de abertura aceita como está.
 - **22/10/2026 (publicação da Fase C, autorizada pelo dono):** C1, C2 e C3 aprovadas. Tela de abertura do app instalado: cor de fundo do manifest trocada de `#E8F1F6` para o azul-mar `#1479B8` (opção 1, sem mexer nas imagens). Commit na `fase-c-novidades`, merge na `main` e push; a Vercel publica sozinha.
 - **22/10/2026 (C2 aprovada pelo dono no teste local, ajuste de ordem do popup feito):** C3 iniciada.
 - **22/10/2026 (C3, código):** botão "Ver novidades da versão 2.0" no rodapé do Dashboard, reabre o popup por evento (`avl-novidades-abrir`). `tsc`, lint e `next build` sem erros. Nenhum commit ou deploy.
